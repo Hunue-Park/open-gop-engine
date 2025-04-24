@@ -2,4 +2,5 @@
 /languages/korean/models/wav2vec2_ctc_dynamic.onnx
 /languages/korean/cpp/build/
 /languages/korean/python/realtime_engine_ko/__pycache__/
+/recordings/*.wav
 
