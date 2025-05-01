@@ -1,6 +1,10 @@
 /venv/
 /languages/korean/models/wav2vec2_ctc_dynamic.onnx
 /languages/korean/cpp/build/
+/languages/korean/cpp/build-ios/
+/languages/korean/cpp/build-ios-simulator/
 /languages/korean/python/realtime_engine_ko/__pycache__/
 /recordings/*.wav
+/languages/korean/cpp/third_party/eigen/
+/languages/korean/cpp/third_party/libsndfile/
 
