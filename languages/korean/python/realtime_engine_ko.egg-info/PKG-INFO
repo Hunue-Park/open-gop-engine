@@ -1,0 +1,10 @@
+Metadata-Version: 2.4
+Name: realtime_engine_ko
+Version: 0.1.0
+Summary: 한국어 실시간 음성 평가 엔진
+Author: OpenGOP Team
+Requires-Dist: numpy
+Requires-Dist: onnxruntime
+Dynamic: author
+Dynamic: requires-dist
+Dynamic: summary

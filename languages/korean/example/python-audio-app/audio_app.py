@@ -6,7 +6,7 @@ import pyaudio
 import wave
 import pprint
 
-from pyrealtime import EngineCoordinator, RecordListener
+from realtime_engine_ko import EngineCoordinator, RecordListener
 
 class RealtimeAudioRecorder:
     def __init__(self, output_dir, filename_prefix="recorded_audio_"):
