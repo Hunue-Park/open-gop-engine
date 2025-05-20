@@ -108,7 +108,6 @@ class EvaluationController:
                     block.text,
                     context_before,
                     context_after,
-                    # 컨텍스트 내 위치는 항상 0 (단독 블록 평가 시)
                     target_index=0 if not context_before else None
                 )
                 
@@ -129,6 +128,7 @@ class EvaluationController:
                 
             except Exception as e:
                 logger.error(f"블록 {block_id} GOP 계산 중 오류: {e}")
+        
         # 최적 매치 블록을 찾았으면 해당 블록 평가 진행
         if best_match_id is not None and best_match_score >= self.confidence_threshold:
             # 평가 가능한 시점인지 확인
@@ -144,41 +144,27 @@ class EvaluationController:
                 if best_match_id == self.sentence_manager.active_block_id:
                     # 1. 현재 활성 블록이 인식된 경우 - 다음 블록으로 진행
                     self.sentence_manager.advance_active_block()
-                    
-                    # ProgressTracker 업데이트
                     self.progress_tracker.set_current_index(self.sentence_manager.active_block_id)
-                    
                 elif best_match_id < self.sentence_manager.active_block_id:
                     # 2. 이전 블록이 인식된 경우 (순서가 뒤바뀐 발화)
                     logger.info(f"이전 블록 {best_match_id}가 인식됨 (현재 활성 블록: {self.sentence_manager.active_block_id})")
-                    
-                    # 활성 블록 상태 업데이트
                     self.sentence_manager.set_active_block(best_match_id)
-                    
-                    # 평가 후에는 다음 블록으로 이동
                     self.sentence_manager.advance_active_block()
-                    
-                    # ProgressTracker 업데이트
                     self.progress_tracker.set_current_index(self.sentence_manager.active_block_id)
-                    
                 elif best_match_id > self.sentence_manager.active_block_id:
                     # 3. 다음 블록이 인식된 경우 (블록을 건너뛴 경우)
                     logger.info(f"건너뛴 블록 {best_match_id}가 인식됨 (현재 활성 블록: {self.sentence_manager.active_block_id})")
-                    
-                    # 중간 블록들 처리 (선택적으로 추가 가능)
-                    # 여기서는 중간 블록들을 넘어가고, 바로 매치된 블록으로 이동
-                    
-                    # 활성 블록을 인식된 블록 다음으로 설정
                     self.sentence_manager.set_active_block(best_match_id + 1)
                     if best_match_id + 1 >= len(self.sentence_manager.blocks):
-                        # 마지막 블록이면 마지막 블록을 활성 상태로 유지
                         self.sentence_manager.set_active_block(best_match_id)
-                    
-                    # ProgressTracker 업데이트
                     self.progress_tracker.set_current_index(self.sentence_manager.active_block_id)
         
-        # 새 형식으로 결과 반환
+        # 결과 반환
         return self._create_result_format()
+    
+    def are_all_blocks_evaluated(self) -> bool:
+        """모든 블록이 평가 완료되었는지 확인"""
+        return all(block.status == BlockStatus.EVALUATED for block in self.sentence_manager.blocks)
     
     def _create_result_format(self) -> Dict[str, Any]:
         """
@@ -267,10 +253,6 @@ class EvaluationController:
         # GOP 점수 설정
         self.sentence_manager.set_block_score(block_id, evaluation_data["gop_score"])
         
-        # 확신도 설정 (있는 경우)
-        # if "confidence" in evaluation_data:
-        #     block.set_confidence(evaluation_data["confidence"])
-
         self.sentence_manager.update_block_status(block_id, BlockStatus.EVALUATED)
         
         logger.info(f"블록 {block_id} ({block.text}) 평가 완료: 점수={block.gop_score}")

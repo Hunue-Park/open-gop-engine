@@ -1,15 +1,16 @@
-from realtime_engine_ko.recognition_engine import EngineCoordinator, RecordListener
+from realtime_engine_ko.recognition_engine import EngineCoordinator
 
-# 클래스 메서드 별칭 추가 (내장 함수 setattr 사용)
-setattr(EngineCoordinator, 'SetRecordListener', EngineCoordinator.set_record_listener)
-setattr(EngineCoordinator, 'Initialize', EngineCoordinator.initialize)
-setattr(EngineCoordinator, 'StartEvaluation', EngineCoordinator.start_evaluation)
-setattr(EngineCoordinator, 'StopEvaluation', EngineCoordinator.stop_evaluation)
+# 클래스 메서드 별칭 추가 (필요시)
+setattr(EngineCoordinator, 'CreateSession', EngineCoordinator.create_session)
+setattr(EngineCoordinator, 'EvaluateAudio', EngineCoordinator.evaluate_audio)
+setattr(EngineCoordinator, 'CloseSession', EngineCoordinator.close_session)
+setattr(EngineCoordinator, 'GetSessionStatus', EngineCoordinator.get_session_status)
+setattr(EngineCoordinator, 'CleanupInactiveSessions', EngineCoordinator.cleanup_inactive_sessions)
 
-# 또는 다음과 같이 직접 클래스 변수에 할당할 수도 있습니다:
-# EngineCoordinator.SetRecordListener = EngineCoordinator.set_record_listener
-# EngineCoordinator.Initialize = EngineCoordinator.initialize
-# EngineCoordinator.StartEvaluation = EngineCoordinator.start_evaluation
-# EngineCoordinator.StopEvaluation = EngineCoordinator.stop_evaluation
+# 또는 직접 클래스 변수에 할당:
+# EngineCoordinator.CreateSession = EngineCoordinator.create_session
+# EngineCoordinator.EvaluateAudio = EngineCoordinator.evaluate_audio
+# EngineCoordinator.CloseSession = EngineCoordinator.close_session
+# 등...
 
-__all__ = ['EngineCoordinator', 'RecordListener']
+__all__ = ['EngineCoordinator']

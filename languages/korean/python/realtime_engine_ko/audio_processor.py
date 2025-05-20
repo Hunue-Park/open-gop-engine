@@ -13,14 +13,13 @@ logger = logging.getLogger("AudioProcessor")
 
 class AudioProcessor:
     """
-    실시간 오디오 파일 모니터링 및 처리를 담당하는 클래스
+    오디오 데이터 처리를 담당하는 클래스 (바이너리 입력 지원)
     """
     
     def __init__(
         self,
         sample_rate: int = 16000,
-        chunk_duration: float = 2.5,  # 2.5초로 증가
-        polling_interval: float = 0.1
+        chunk_duration: float = 2.5
     ):
         """
         오디오 프로세서 초기화
@@ -28,18 +27,9 @@ class AudioProcessor:
         Args:
             sample_rate: 목표 샘플링 레이트 (Hz)
             chunk_duration: 처리할 청크 단위 시간 (초)
-            polling_interval: 파일 변경 확인 간격 (초)
         """
         self.sample_rate = sample_rate
         self.chunk_duration = chunk_duration
-        self.polling_interval = polling_interval
-        
-        # 파일 모니터링 상태
-        self.audio_file_path: Optional[str] = None
-        self.last_file_size: int = 0
-        self.last_processed_pos: int = 0
-        self.is_monitoring: bool = False
-        self.monitoring_thread: Optional[threading.Thread] = None
         
         # 청크 처리를 위한 상태
         self.buffer: List[np.ndarray] = []
@@ -50,222 +40,69 @@ class AudioProcessor:
         # 이벤트 기반 메커니즘
         self.chunk_callbacks = []  # 청크 생성 시 호출할 콜백 함수 목록
         
-    def set_audio_file(self, file_path: str) -> bool:
+    def process_audio_binary(self, binary_data) -> Optional[torch.Tensor]:
         """
-        모니터링할 오디오 파일 설정
+        바이너리 오디오 데이터 처리
         
         Args:
-            file_path: 오디오 파일 경로
+            binary_data: 바이너리 오디오 데이터 (일반적으로 int16 형식)
             
         Returns:
-            bool: 성공 여부
+            Optional[torch.Tensor]: 처리된 오디오 텐서 또는 None
         """
-        if not os.path.exists(file_path):
-            logger.error(f"파일이 존재하지 않습니다: {file_path}")
-            return False
-            
-        self.audio_file_path = file_path
-        self.last_file_size = os.path.getsize(file_path)
-        self.last_processed_pos = 0
-        self.total_duration = 0.0
-        self.buffer = []
-        self.latest_chunk = None
-        return True
-        
-    def start_monitoring(self) -> bool:
-        """
-        오디오 파일 모니터링 시작
-        
-        Returns:
-            bool: 성공 여부
-        """
-        if self.is_monitoring:
-            logger.warning("이미 모니터링 중입니다.")
-            return False
-            
-        if not self.audio_file_path:
-            logger.error("모니터링할 오디오 파일이 설정되지 않았습니다.")
-            return False
-            
-        self.is_monitoring = True
-        self.monitoring_thread = threading.Thread(
-            target=self._monitoring_loop,
-            daemon=True
-        )
-        self.monitoring_thread.start()
-        logger.info(f"오디오 파일 모니터링 시작: {self.audio_file_path}")
-        return True
-        
-    def stop_monitoring(self) -> None:
-        """모니터링 중지"""
-        self.is_monitoring = False
-        if self.monitoring_thread and self.monitoring_thread.is_alive():
-            self.monitoring_thread.join(timeout=1.0)
-        logger.info("오디오 파일 모니터링 중지")
-        
-    def _monitoring_loop(self) -> None:
-        """
-        오디오 파일 변경 모니터링 루프
-        (내부 스레드에서 실행)
-        """
-        if not self.audio_file_path:
-            return
-            
-        while self.is_monitoring:
-            try:
-                # 파일 크기 확인
-                current_size = os.path.getsize(self.audio_file_path)
-                
-                # 파일 크기가 증가했으면 새 데이터 처리
-                if current_size > self.last_file_size:
-                    self._process_new_audio_data()
-                    self.last_file_size = current_size
-                    
-                # 다음 확인까지 대기
-                time.sleep(self.polling_interval)
-                
-            except Exception as e:
-                logger.error(f"파일 모니터링 중 오류 발생: {e}")
-                time.sleep(self.polling_interval)
-                
-    def _process_new_audio_data(self) -> None:
-        """
-        새로 추가된 오디오 데이터 처리
-        """
-        if not self.audio_file_path:
-            return
-            
         try:
-            # 파일에서 새 데이터 읽기
-            with sf.SoundFile(self.audio_file_path, 'r') as f:
-                # 마지막 처리 위치로 이동
-                f.seek(self.last_processed_pos)
-                
-                # 새 데이터 읽기
-                frames = f.read()
-                
-                if len(frames) > 0:
-                    # 새 데이터 처리
-                    self._add_to_buffer(frames)
-                    
-                    # 처리 위치 업데이트
-                    self.last_processed_pos = f.tell()
-                    
+            # 먼저 int16으로 가정하고 처리 (PyAudio 기본 포맷)
+            audio_data = np.frombuffer(binary_data, dtype=np.int16)
+            
+            # int16을 float32로 변환 및 정규화 (-1.0 ~ 1.0 범위)
+            audio_data = audio_data.astype(np.float32) / 32768.0
+            
+            # 채널 수 확인 (모노로 변환)
+            if audio_data.ndim > 1:
+                audio_data = np.mean(audio_data, axis=1)
+            
+            # VAD 및 전처리
+            processed_chunk = self._preprocess_audio_data(audio_data)
+            
+            # 총 녹음 시간 업데이트
+            self.total_duration += len(audio_data) / self.sample_rate
+            
+            return processed_chunk
+            
         except Exception as e:
-            logger.error(f"새 오디오 데이터 처리 중 오류 발생: {e}")
-            
-    def _add_to_buffer(self, audio_data: np.ndarray) -> None:
+            logger.error(f"오디오 바이너리 처리 중 오류 발생: {e}")
+            return None
+    
+    def _preprocess_audio_data(self, audio_data: np.ndarray, do_normalize: bool = True) -> Optional[torch.Tensor]:
         """
-        오디오 데이터를 버퍼에 추가
+        오디오 데이터 직접 전처리
         
         Args:
-            audio_data: 추가할 오디오 데이터 (numpy 배열)
-        """
-        # 데이터 정규화 (필요시)
-        if np.max(np.abs(audio_data)) > 1.0:
-            audio_data = audio_data / np.max(np.abs(audio_data))
-            
-        # 채널 수 확인 (모노로 변환)
-        if audio_data.ndim > 1:
-            audio_data = np.mean(audio_data, axis=1)
-            
-        # 버퍼에 추가
-        self.buffer.append(audio_data)
-        
-        # 총 녹음 시간 업데이트
-        self.total_duration += len(audio_data) / self.sample_rate
-        
-        # 새 청크 생성 가능한지 확인
-        self._check_and_process_chunks()
-        
-    def _check_and_process_chunks(self) -> None:
-        """
-        버퍼에서 청크 단위로 처리 가능한지 확인하고 처리
-        """
-        # 버퍼의 전체 샘플 수 계산
-        # total_samples = sum(len(data) for data in self.buffer)
-        chunk_samples = int(self.chunk_duration * self.sample_rate)
-        # 청크 추출
-        chunk = self._extract_chunk(chunk_samples)
-        
-        # 청크 전처리 및 저장
-        self.latest_chunk = self._preprocess_chunk(chunk)
-        # 청크 타임스탬프 업데이트
-        self.last_chunk_time = time.time()
-        
-        # # 처리된 샘플 수 업데이트
-        # total_samples -= chunk_samples
-        
-        # 청크 생성 후 콜백 호출
-        if self.latest_chunk is not None:
-            metadata = {
-                "timestamp": time.time(),
-                "duration": self.chunk_duration,
-                "total_duration": self.total_duration
-            }
-            for callback in self.chunk_callbacks:
-                callback(self.latest_chunk, metadata)
-            
-        
-    def _extract_chunk(self, chunk_samples: int) -> np.ndarray:
-        """
-        버퍼에서 지정된 크기의 청크 추출
-        
-        Args:
-            chunk_samples: 추출할 샘플 수
-            
-        Returns:
-            np.ndarray: 추출된 청크
-        """
-        result = np.array([], dtype=np.float32)
-        samples_collected = 0
-        
-        while samples_collected < chunk_samples and self.buffer:
-            buffer_data = self.buffer[0]
-            samples_needed = chunk_samples - samples_collected
-            
-            if len(buffer_data) <= samples_needed:
-                # 버퍼 데이터 전체 사용
-                result = np.append(result, buffer_data)
-                samples_collected += len(buffer_data)
-                self.buffer.pop(0)
-            else:
-                # 버퍼 데이터 일부만 사용
-                result = np.append(result, buffer_data[:samples_needed])
-                self.buffer[0] = buffer_data[samples_needed:]
-                samples_collected += samples_needed
-                
-        return result
-        
-    def _preprocess_chunk(self, chunk: np.ndarray, do_normalize: bool = True) -> torch.Tensor:
-        """
-        오디오 청크를 w2v_onnx_core와 호환되는 포맷으로 전처리
-        
-        Args:
-            chunk: 처리할 오디오 청크
+            audio_data: numpy 배열 형태의 오디오 데이터
             do_normalize: 정규화 여부
             
         Returns:
-            torch.Tensor: 처리된 오디오 텐서 [1, T]
+            Optional[torch.Tensor]: 전처리된 오디오 텐서, 유효하지 않으면 None
         """
         # VAD 검사 - 음성이 없으면 None 반환
-        if not self._detect_voice_activity(chunk):
+        if not self._detect_voice_activity(audio_data):
             return None
+            
         # 1) 모노화 (이미 모노인 경우 건너뜀)
-        if chunk.ndim > 1:
-            chunk = np.mean(chunk, axis=1)
+        if audio_data.ndim > 1:
+            audio_data = np.mean(audio_data, axis=1)
         
         # 2) 정규화
         if do_normalize:
-            m = chunk.mean()
-            s = chunk.std()
-            chunk = (chunk - m) / (s + 1e-8)
+            m = audio_data.mean()
+            s = audio_data.std()
+            audio_data = (audio_data - m) / (s + 1e-8)
         
         # 3) float32로 캐스팅
-        chunk = chunk.astype(np.float32)
+        audio_data = audio_data.astype(np.float32)
         
         # 4) torch.Tensor로 변환 및 배치 차원 추가
-        tensor = torch.from_numpy(chunk).unsqueeze(0)  # shape: [1, T]
+        tensor = torch.from_numpy(audio_data).unsqueeze(0)  # shape: [1, T]
         
         return tensor
     
@@ -303,34 +140,9 @@ class AudioProcessor:
         
         # 임계값을 넘는 프레임이 충분한지 확인
         return speech_frames >= min_speech_frames
-        
-    def get_latest_chunk(self) -> Tuple[Optional[torch.Tensor], Dict[str, Any]]:
-        """
-        가장 최근 처리된 청크와 메타데이터 반환
-        w2v_onnx_core와 호환되는 형식으로 반환
-        
-        Returns:
-            Tuple[Optional[torch.Tensor], Dict[str, Any]]: 
-                (전처리된 청크 텐서[1,T], 메타데이터)
-        """
-        metadata = {
-            "timestamp": time.time(),
-            "duration": self.chunk_duration,
-            "total_duration": self.total_duration
-        }
-        
-        # 실제 청크가 없는 경우
-        if self.latest_chunk is None:
-            return None, metadata
-            
-        return self.latest_chunk, metadata
-        
+    
     def reset(self) -> None:
         """상태 초기화"""
-        self.stop_monitoring()
-        self.audio_file_path = None
-        self.last_file_size = 0
-        self.last_processed_pos = 0
         self.buffer = []
         self.total_duration = 0.0
         self.last_chunk_time = None
