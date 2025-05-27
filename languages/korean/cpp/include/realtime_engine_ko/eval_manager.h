@@ -29,6 +29,8 @@ public:
     std::map<std::string, std::any> GetEvaluationSummary() const;
     void Reset();
     
+    bool AreAllBlocksEvaluated() const;
+    
 private:
     std::map<std::string, std::any> CreateResultFormat() const;
     void EvaluateBlock(int block_id, const std::map<std::string, std::any>& evaluation_data);

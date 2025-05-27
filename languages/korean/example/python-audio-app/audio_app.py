@@ -27,7 +27,7 @@ class RealtimeAudioProcessor:
         """새 평가 세션 시작"""
         config_options = {
             "min_time_between_evals": 0.5,
-            "confidence_threshold": 30
+            "confidence_threshold": 30.0
         }
         response = self.engine.create_session(text, config_options)
         self.session_id = response["session_id"]
@@ -110,8 +110,9 @@ class RealtimeAudioProcessor:
             total_blocks = len(self.session_text.split())
             progress = f"{len(words)}/{total_blocks}"
             score = result["result"].get("overall", 0)
+            pprint.pprint(result)
             
-            print(f"\r상태: {status} | 진행: {progress} | 현재 점수: {score}", end="")
+            # print(f"\r상태: {status} | 진행: {progress} | 현재 점수: {score}", end="")
             
             # 완료된 경우 최종 결과 표시
             if status == "completed":

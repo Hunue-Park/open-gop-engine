@@ -375,4 +375,13 @@ void EvaluationController::Reset() {
     LOG_INFO("EvaluationController", "평가 상태 초기화");
 }
 
+bool EvaluationController::AreAllBlocksEvaluated() const {
+    for (const auto& block : sentence_manager->blocks) {
+        if (block->status != BlockStatus::EVALUATED) {
+            return false;
+        }
+    }
+    return true;
+}
+
 } // namespace realtime_engine_ko

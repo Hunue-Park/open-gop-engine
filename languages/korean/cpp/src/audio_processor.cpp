@@ -6,6 +6,7 @@
 #include <cmath>
 #include <chrono>
 #include <thread>
+#include <Eigen/Dense>
 
 namespace realtime_engine_ko {
 
@@ -290,9 +291,27 @@ AudioProcessor::AudioTensor AudioProcessor::ExtractChunk(int chunk_samples) {
     return tensor;
 }
 
-AudioProcessor::AudioTensor AudioProcessor::PreprocessChunk(const std::vector<float>& chunk, bool do_normalize) {
+AudioProcessor::AudioTensor AudioProcessor::PreprocessChunk(
+    const std::vector<float>& chunk, 
+    bool do_normalize) {
+    
+    // 오디오의 최대 진폭 계산
+    float max_amplitude = 0.0f;
+    for (const auto& sample : chunk) {
+        max_amplitude = std::max(max_amplitude, std::abs(sample));
+    }
+    
+    // 적응형 VAD 임계값 - 오디오 특성에 맞게 조정
+    float adaptive_threshold = 0.00005f;  // 기본 낮은 임계값
+    int adaptive_min_frames = 5;          // 더 낮은 최소 프레임 수
+    
+    // 매우 조용한 오디오인 경우 임계값 추가 감소
+    if (max_amplitude < 0.01f) {
+        adaptive_threshold = 0.00001f;  // 더 낮은 임계값
+    }
+    
     // VAD 검사 - 음성이 없으면 빈 텐서 반환
-    if (!DetectVoiceActivity(chunk)) {
+    if (!DetectVoiceActivity(chunk, adaptive_threshold, adaptive_min_frames)) {
         return AudioTensor();
     }
     
@@ -413,6 +432,89 @@ void AudioProcessor::AddChunkCallback(CallbackFunc callback) {
     if (callback) {
         chunk_callbacks.push_back(std::move(callback));
         LOG_INFO("AudioProcessor", "청크 콜백 함수 등록됨");
+    }
+}
+
+Eigen::Matrix<float, Eigen::Dynamic, 1> AudioProcessor::ProcessAudioBinary(
+    const std::vector<uint8_t>& binary_data) {
+    
+    try {
+        // 바이너리 데이터를 int16_t로 변환
+        if (binary_data.size() % 2 != 0) {
+            LOG_ERROR("AudioProcessor", "바이너리 데이터 크기가 올바르지 않습니다");
+            return Eigen::Matrix<float, Eigen::Dynamic, 1>();
+        }
+        
+        // int16을 float로 변환 - Python 코드와 동일한 방식
+        std::vector<float> audio_float(binary_data.size() / 2);
+        const int16_t* int16_data = reinterpret_cast<const int16_t*>(binary_data.data());
+        
+        for (size_t i = 0; i < audio_float.size(); ++i) {
+            audio_float[i] = static_cast<float>(int16_data[i]) / 32768.0f;
+        }
+        
+        // 로깅 추가 - 디버깅용
+        float max_abs = 0.0f;
+        float sum = 0.0f;
+        for (const auto& sample : audio_float) {
+            max_abs = std::max(max_abs, std::abs(sample));
+            sum += sample;
+        }
+        float mean = sum / audio_float.size();
+        
+        LOG_INFO("AudioProcessor", "오디오 통계: 최대=" + std::to_string(max_abs) + 
+                               ", 평균=" + std::to_string(mean) +
+                               ", 길이=" + std::to_string(audio_float.size()));
+        
+        // VAD 직접 수행 - 매우 낮은 임계값 사용
+        const float vad_threshold = 0.00001f;
+        const int min_frames = 3;
+        
+        bool has_voice = DetectVoiceActivity(audio_float, vad_threshold, min_frames);
+        
+        // 중요 변경점: VAD 성공 여부와 관계없이 항상 오디오 텐서 반환
+        // 다만 VAD 실패 시 로그만 출력
+        if (!has_voice) {
+            LOG_INFO("AudioProcessor", "VAD 실패: 음성 감지되지 않음");
+            // 하지만 오디오는 계속 처리
+        } else {
+            LOG_INFO("AudioProcessor", "VAD 성공: 음성 감지됨");
+        }
+        
+        // 정규화 수행 - Python 코드와 동일하게
+        float audio_mean = 0.0f;
+        for (const auto& sample : audio_float) {
+            audio_mean += sample;
+        }
+        audio_mean /= audio_float.size();
+        
+        float stddev = 0.0f;
+        for (const auto& sample : audio_float) {
+            stddev += (sample - audio_mean) * (sample - audio_mean);
+        }
+        stddev = std::sqrt(stddev / audio_float.size()) + 1e-8f;
+        
+        std::vector<float> normalized(audio_float.size());
+        for (size_t i = 0; i < audio_float.size(); ++i) {
+            normalized[i] = (audio_float[i] - audio_mean) / stddev;
+        }
+        
+        // Eigen::Matrix로 변환
+        Eigen::Matrix<float, Eigen::Dynamic, 1> result(normalized.size());
+        for (size_t i = 0; i < normalized.size(); ++i) {
+            result(i) = normalized[i];
+        }
+        
+        // 처리 통계 업데이트
+        last_chunk_time = std::chrono::system_clock::now();
+        total_duration += static_cast<float>(audio_float.size()) / static_cast<float>(sample_rate);
+        
+        return result;
+    } catch (const std::exception& e) {
+        std::stringstream ss;
+        ss << "오디오 바이너리 처리 중 오류 발생: " << e.what();
+        LOG_ERROR("AudioProcessor", ss.str());
+        return Eigen::Matrix<float, Eigen::Dynamic, 1>();
     }
 }
 

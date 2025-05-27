@@ -30,6 +30,10 @@ public:
     void Reset();
     void AddChunkCallback(CallbackFunc callback);
     
+    // 바이너리 데이터 직접 처리 메서드
+    Eigen::Matrix<float, Eigen::Dynamic, 1> ProcessAudioBinary(
+        const std::vector<uint8_t>& binary_data);
+    
 private:
     void MonitoringLoop();
     void ProcessNewAudioData();

@@ -1,6 +1,6 @@
 # src/cpp/CMakeLists.txt
 cmake_minimum_required(VERSION 3.14)
-project(realtime_engine_ko_cpp VERSION 0.1.0 LANGUAGES CXX C)
+project(realtime_engine_ko_cpp VERSION 0.1.0 LANGUAGES CXX)
 
 # 컴파일러 옵션 설정
 set(CMAKE_CXX_STANDARD 17)
@@ -24,6 +24,14 @@ FetchContent_Declare(
   GIT_TAG v3.11.2
 )
 FetchContent_MakeAvailable(json)
+
+# pybind11 설정 추가
+FetchContent_Declare(
+  pybind11
+  GIT_REPOSITORY https://github.com/pybind/pybind11.git
+  GIT_TAG v2.10.4
+)
+FetchContent_MakeAvailable(pybind11)
 
 # 외부 패키지 찾기
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
@@ -56,15 +64,6 @@ set(HEADERS
     dtw/dtw_algorithm.h
 )
 
-# C 인터페이스 소스 및 헤더 파일
-set(C_API_SOURCES
-    src/realtime_engine_c.cpp
-)
-
-set(C_API_HEADERS
-    include/realtime_engine_ko_c/realtime_engine_c.h
-)
-
 # C++ 코어 라이브러리 생성
 add_library(realtime_engine_ko_cpp STATIC ${SOURCES} ${HEADERS})
 
@@ -87,35 +86,16 @@ target_link_libraries(realtime_engine_ko_cpp PUBLIC
     nlohmann_json::nlohmann_json
 )
 
-# C 인터페이스 정적 라이브러리 생성
-add_library(realtime_engine_ko_c STATIC ${C_API_SOURCES} ${C_API_HEADERS})
+# Python 바인딩 모듈 빌드
+pybind11_add_module(pyrealtime python_bindings.cpp)
+target_link_libraries(pyrealtime PRIVATE realtime_engine_ko_cpp)
 
-# C 인터페이스 헤더 경로 설정
-target_include_directories(realtime_engine_ko_c PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    $<INSTALL_INTERFACE:include>
+# Python 모듈 출력 디렉토리 설정 (선택 사항)
+set_target_properties(pyrealtime PROPERTIES
+    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/python"
 )
 
-# C++ 라이브러리와 C 인터페이스 연결
-target_link_libraries(realtime_engine_ko_c PRIVATE
-    realtime_engine_ko_cpp
-)
-
-# 설치 규칙 - C 인터페이스 라이브러리 (헤더와 .a 파일)
-install(TARGETS realtime_engine_ko_c
-    EXPORT realtime_engine_ko_c-targets
-    LIBRARY DESTINATION lib
-    ARCHIVE DESTINATION lib
-    RUNTIME DESTINATION bin
-    INCLUDES DESTINATION include
-)
-
-install(DIRECTORY include/realtime_engine_ko_c/
-    DESTINATION include/realtime_engine_ko_c
-    FILES_MATCHING PATTERN "*.h"
-)
-
-# 예제 및 테스트 빌드 설정
+# 예제 및 테스트 빌드 설정 (선택적)
 option(BUILD_EXAMPLES "Build example applications" OFF)
 if(BUILD_EXAMPLES)
     add_subdirectory(examples)

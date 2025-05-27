@@ -2,86 +2,70 @@
 #pragma once
 
 #include <string>
-#include <memory>
-#include <thread>
-#include <atomic>
-#include <functional>
+#include <vector>
 #include <map>
-#include <nlohmann/json.hpp>
-
-#include "sentence_block.h"
-#include "progress_tracker.h"
-#include "audio_processor.h"
-#include "w2v_onnx_core.h"
-#include "eval_manager.h"
+#include <any>
+#include <functional>
+#include <memory>
+#include <chrono>
+#include "realtime_engine_ko/w2v_onnx_core.h"
+#include "realtime_engine_ko/sentence_block.h"
+#include "realtime_engine_ko/progress_tracker.h"
+#include "realtime_engine_ko/audio_processor.h"
+#include "realtime_engine_ko/eval_manager.h"
 
 namespace realtime_engine_ko {
 
-class RecordListener {
-public:
-    using StartCallback = std::function<void()>;
-    using TickCallback = std::function<void(int, int)>;
-    using FailCallback = std::function<void(const std::string&)>;
-    using EndCallback = std::function<void()>;
-    using ScoreCallback = std::function<void(const std::string&)>;
-    
-    RecordListener(
-        StartCallback on_start = nullptr,
-        TickCallback on_tick = nullptr,
-        FailCallback on_start_record_fail = nullptr,
-        EndCallback on_record_end = nullptr,
-        ScoreCallback on_score = nullptr);
-    
-    StartCallback on_start;
-    TickCallback on_tick;
-    FailCallback on_start_record_fail;
-    EndCallback on_record_end;
-    ScoreCallback on_score;
-};
-
+// EngineCoordinator 클래스
 class EngineCoordinator {
 public:
+    // 세션 데이터 구조체
+    struct SessionData {
+        std::shared_ptr<SentenceBlockManager> sentence_manager;
+        std::shared_ptr<ProgressTracker> progress_tracker;
+        std::shared_ptr<AudioProcessor> audio_processor;
+        std::shared_ptr<EvaluationController> eval_controller;
+        std::chrono::system_clock::time_point created_at;
+        std::chrono::system_clock::time_point last_activity;
+    };
+    
+    // 생성자
     EngineCoordinator(
         const std::string& onnx_model_path,
         const std::string& tokenizer_path,
         const std::string& device = "CPU",
-        float update_interval = 0.3f,
         float confidence_threshold = 0.7f);
     
+    // 소멸자
     ~EngineCoordinator();
     
-    void SetRecordListener(const RecordListener& record_listener);
-    bool Initialize(const std::string& sentence, float audio_polling_interval = 0.03f, float min_time_between_evals = 0.5f);
-    bool StartEvaluation(const std::string& audio_file_path);
-    void StopEvaluation();
-    std::map<std::string, std::any> GetCurrentState() const;
-    void Reset();
-    
-    // 외부 API 메서드
-    std::map<std::string, std::any> EvaluateSpeech(
+    // 세션 관리 메서드
+    std::map<std::string, std::any> CreateSession(
         const std::string& sentence,
-        const std::string& audio_file_path,
-        const RecordListener& record_listener = RecordListener());
+        const std::map<std::string, std::any>& engine_options = {});
     
-    std::map<std::string, std::any> GetResults() const;
+    std::map<std::string, std::any> EvaluateAudio(
+        const std::string& session_id,
+        const std::vector<uint8_t>& binary_data);
+    
+    std::map<std::string, std::any> CloseSession(const std::string& session_id);
+    
+    std::map<std::string, std::any> GetSessionStatus(const std::string& session_id);
+    
+    int CleanupInactiveSessions(float max_inactive_time = 3600.0f);
     
 private:
-    void TimerLoop();
-    void OnNewChunk(const AudioProcessor::AudioTensor& audio_chunk, const std::map<std::string, std::any>& metadata);
-    
+    // 인식 엔진
     std::shared_ptr<Wav2VecCTCOnnxCore> recognition_engine;
-    std::shared_ptr<SentenceBlockManager> sentence_manager;
-    std::shared_ptr<ProgressTracker> progress_tracker;
-    std::shared_ptr<AudioProcessor> audio_processor;
-    std::shared_ptr<EvaluationController> eval_controller;
     
-    bool is_initialized;
-    std::atomic<bool> is_running;
-    float update_interval;
+    // 세션 관리
+    std::map<std::string, SessionData> sessions;
+    
+    // 설정값
     float confidence_threshold;
-    std::unique_ptr<std::thread> timer_thread;
     
-    RecordListener record_listener;
+    // 유틸리티 메서드
+    std::map<std::string, std::any> CreateEmptyResult() const;
 };
 
 } // namespace realtime_engine_ko
