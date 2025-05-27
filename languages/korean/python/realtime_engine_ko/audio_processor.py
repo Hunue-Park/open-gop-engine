@@ -18,27 +18,20 @@ class AudioProcessor:
     
     def __init__(
         self,
-        sample_rate: int = 16000,
-        chunk_duration: float = 2.5
+        sample_rate: int = 16000
     ):
         """
         오디오 프로세서 초기화
         
         Args:
             sample_rate: 목표 샘플링 레이트 (Hz)
-            chunk_duration: 처리할 청크 단위 시간 (초)
         """
         self.sample_rate = sample_rate
-        self.chunk_duration = chunk_duration
         
-        # 청크 처리를 위한 상태
-        self.buffer: List[np.ndarray] = []
-        self.last_chunk_time: Optional[float] = None
+        # 처리 상태 추적
+        self.last_process_time: Optional[float] = None
         self.total_duration: float = 0.0
         self.latest_chunk: Optional[torch.Tensor] = None
-        
-        # 이벤트 기반 메커니즘
-        self.chunk_callbacks = []  # 청크 생성 시 호출할 콜백 함수 목록
         
     def process_audio_binary(self, binary_data) -> Optional[torch.Tensor]:
         """
@@ -64,7 +57,8 @@ class AudioProcessor:
             # VAD 및 전처리
             processed_chunk = self._preprocess_audio_data(audio_data)
             
-            # 총 녹음 시간 업데이트
+            # 처리 시간 및 총 오디오 길이 업데이트
+            self.last_process_time = time.time()
             self.total_duration += len(audio_data) / self.sample_rate
             
             return processed_chunk
@@ -143,11 +137,6 @@ class AudioProcessor:
     
     def reset(self) -> None:
         """상태 초기화"""
-        self.buffer = []
         self.total_duration = 0.0
-        self.last_chunk_time = None
+        self.last_process_time = None
         self.latest_chunk = None
-        
-    def add_chunk_callback(self, callback):
-        """청크 생성 시 호출할 콜백 함수 등록"""
-        self.chunk_callbacks.append(callback)

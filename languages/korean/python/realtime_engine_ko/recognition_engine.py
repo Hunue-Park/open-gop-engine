@@ -71,17 +71,21 @@ class EngineCoordinator:
         
         logger.info("EngineCoordinator 초기화 완료")
     
-    def create_session(self, sentence: str) -> Dict[str, Any]:
+    def create_session(self, sentence: str, engine_options: Dict[str, Any] = {}) -> Dict[str, Any]:
         """
         평가 세션 생성 (문장 초기화)
         
         Args:
             sentence: 평가할 문장
-            
+            engine_options: 엔진 옵션 (예: {"confidence_threshold": 0.7})
         Returns:
             Dict[str, Any]: 세션 정보
         """
         session_id = str(uuid.uuid4())
+        
+        # 엔진 옵션 처리
+        confidence_threshold = engine_options.get("confidence_threshold", self.confidence_threshold)
+        min_time_between_evals = engine_options.get("min_time_between_evals", 0.5)
         
         # 세션별 컴포넌트 초기화
         sentence_manager = SentenceBlockManager(sentence)
@@ -91,15 +95,14 @@ class EngineCoordinator:
             time_based_advance=False
         )
         audio_processor = AudioProcessor(
-            sample_rate=16000,
-            chunk_duration=2.0
+            sample_rate=16000
         )
         eval_controller = EvaluationController(
             recognition_engine=self.recognition_engine,
             sentence_manager=sentence_manager,
             progress_tracker=progress_tracker,
-            confidence_threshold=self.confidence_threshold,
-            min_time_between_evals=0.5
+            confidence_threshold=confidence_threshold,
+            min_time_between_evals=min_time_between_evals
         )
         
         # 세션 정보 저장

@@ -25,7 +25,11 @@ class RealtimeAudioProcessor:
 
     def start_session(self, text):
         """새 평가 세션 시작"""
-        response = self.engine.create_session(text)
+        config_options = {
+            "min_time_between_evals": 0.5,
+            "confidence_threshold": 30
+        }
+        response = self.engine.create_session(text, config_options)
         self.session_id = response["session_id"]
         self.session_text = text
         self.current_result = None
