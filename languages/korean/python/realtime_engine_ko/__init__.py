@@ -5,6 +5,8 @@ except ImportError as e:
     print(f"Warning: C++ 바인딩을 불러올 수 없습니다. Python 구현을 사용합니다. 오류: {e}")
     from .recognition_engine import EngineCoordinator
 
+# from .recognition_engine import EngineCoordinator
+
 # 클래스 메서드 별칭 추가 (필요시)
 setattr(EngineCoordinator, 'CreateSession', EngineCoordinator.create_session)
 setattr(EngineCoordinator, 'EvaluateAudio', EngineCoordinator.evaluate_audio)

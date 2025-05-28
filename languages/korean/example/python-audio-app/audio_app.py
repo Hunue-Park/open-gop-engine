@@ -80,22 +80,53 @@ class RealtimeAudioProcessor:
     
     def _process_audio(self):
         """주기적으로 오디오 청크를 처리하고 평가 결과 획득"""
+        counter = 0
+        total_frames = 0
+        
         while not self.stop_event.is_set() and self.is_recording:
             if self.frames_buffer and self.session_id:
-                # 버퍼에서 일정량 데이터 가져오기 (복사 후 처리)
-                frames_to_process = self.frames_buffer.copy()
+                counter += 1
+                # 버퍼 상태 로깅
+                buffer_size = len(self.frames_buffer)
+                total_frames += buffer_size
                 
-                # 바이너리 데이터로 변환
+                print(f"[처리 #{counter}] 버퍼 크기: {buffer_size} 프레임, 누적: {total_frames} 프레임")
+                
+                frames_to_process = self.frames_buffer.copy()
                 audio_binary = b''.join(frames_to_process)
                 
-                # 평가 요청
+                # 바이너리 크기 확인
+                print(f"[처리 #{counter}] 바이너리 크기: {len(audio_binary)} 바이트")
+                
+                # 엔진 호출 전
+                start_time = time.time()
+                print(f"[엔진 호출] 시작: {start_time}, 데이터 크기: {len(audio_binary)} 바이트")
+
+                # 엔진 호출
                 result = self.engine.evaluate_audio(self.session_id, audio_binary)
+
+                # 엔진 호출 후
+                end_time = time.time()
+                print(f"[엔진 호출] 완료: {end_time}, 소요 시간: {end_time - start_time:.3f}초")
+                
                 self.current_result = result
                 
-                # 결과 출력 
+                # 결과 상태 확인
+                print(f"[처리 #{counter}] 결과 상태: {result.get('status', 'unknown')}")
+                
+                # 버퍼 변화 확인
+                print(f"[처리 #{counter}] 처리 후 버퍼 크기: {len(self.frames_buffer)} 프레임")
+                
                 self._display_result(result)
                 
-            time.sleep(0.3)  # 300ms 간격으로 처리
+                # 결과 분석
+                if "result" in result:
+                    word_count = len(result["result"].get("words", []))
+                    print(f"[엔진 응답] 인식된 단어 수: {word_count}")
+                    if "error" in result:
+                        print(f"[엔진 오류] {result['error']}: {result.get('message', '')}")
+                
+            time.sleep(0.3)
     
     def _display_result(self, result):
         """평가 결과 표시"""
@@ -159,12 +190,23 @@ class RealtimeAudioProcessor:
         if not self.current_file or not self.frames_buffer:
             return
             
+        # 저장 직전 로깅
+        total_frames = len(self.frames_buffer)
+        total_bytes = sum(len(frame) for frame in self.frames_buffer)
+        total_seconds = total_bytes / (16000 * 2)  # 16000Hz, 16bit(2바이트)
+        
+        print(f"\n저장 정보: {total_frames} 프레임, {total_bytes} 바이트, 약 {total_seconds:.2f}초")
+        
         try:
             wf = wave.open(self.current_file, 'wb')
             wf.setnchannels(1)
             wf.setsampwidth(self.audio.get_sample_size(pyaudio.paInt16))
             wf.setframerate(16000)
-            wf.writeframes(b''.join(self.frames_buffer))
+            
+            audio_data = b''.join(self.frames_buffer)
+            print(f"실제 저장 크기: {len(audio_data)} 바이트")
+            
+            wf.writeframes(audio_data)
             wf.close()
             print(f"녹음 파일 저장됨: {self.current_file}")
         except Exception as e:

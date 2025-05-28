@@ -18,15 +18,19 @@ class AudioProcessor:
     
     def __init__(
         self,
-        sample_rate: int = 16000
+        sample_rate: int = 16000,
+        max_buffer_seconds: float = 10.0
     ):
         """
         오디오 프로세서 초기화
         
         Args:
             sample_rate: 목표 샘플링 레이트 (Hz)
+            max_buffer_seconds: 최대 버퍼 길이 (초)
         """
         self.sample_rate = sample_rate
+        self.max_buffer_length = int(sample_rate * max_buffer_seconds)
+        self.audio_buffer = np.array([], dtype=np.float32)
         
         # 처리 상태 추적
         self.last_process_time: Optional[float] = None
@@ -45,23 +49,17 @@ class AudioProcessor:
         """
         try:
             # 먼저 int16으로 가정하고 처리 (PyAudio 기본 포맷)
-            audio_data = np.frombuffer(binary_data, dtype=np.int16)
+            audio_data = np.frombuffer(binary_data, dtype=np.int16).astype(np.float32) / 32768.0
             
-            # int16을 float32로 변환 및 정규화 (-1.0 ~ 1.0 범위)
-            audio_data = audio_data.astype(np.float32) / 32768.0
+            # 버퍼에 추가
+            self.audio_buffer = np.append(self.audio_buffer, audio_data)
             
-            # 채널 수 확인 (모노로 변환)
-            if audio_data.ndim > 1:
-                audio_data = np.mean(audio_data, axis=1)
+            # 최대 길이 제한
+            if len(self.audio_buffer) > self.max_buffer_length:
+                self.audio_buffer = self.audio_buffer[-self.max_buffer_length:]
             
-            # VAD 및 전처리
-            processed_chunk = self._preprocess_audio_data(audio_data)
-            
-            # 처리 시간 및 총 오디오 길이 업데이트
-            self.last_process_time = time.time()
-            self.total_duration += len(audio_data) / self.sample_rate
-            
-            return processed_chunk
+            # 전체 버퍼에 대한 전처리 및 반환
+            return self._preprocess_audio_data(self.audio_buffer)
             
         except Exception as e:
             logger.error(f"오디오 바이너리 처리 중 오류 발생: {e}")

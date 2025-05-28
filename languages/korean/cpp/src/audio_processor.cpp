@@ -471,14 +471,9 @@ Eigen::Matrix<float, Eigen::Dynamic, 1> AudioProcessor::ProcessAudioBinary(
         const int min_frames = 3;
         
         bool has_voice = DetectVoiceActivity(audio_float, vad_threshold, min_frames);
-        
-        // 중요 변경점: VAD 성공 여부와 관계없이 항상 오디오 텐서 반환
-        // 다만 VAD 실패 시 로그만 출력
         if (!has_voice) {
             LOG_INFO("AudioProcessor", "VAD 실패: 음성 감지되지 않음");
-            // 하지만 오디오는 계속 처리
-        } else {
-            LOG_INFO("AudioProcessor", "VAD 성공: 음성 감지됨");
+            return Eigen::Matrix<float, Eigen::Dynamic, 1>();  // 빈 텐서 반환
         }
         
         // 정규화 수행 - Python 코드와 동일하게
