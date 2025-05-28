@@ -81,42 +81,48 @@ class RealtimeAudioProcessor:
     def _process_audio(self):
         """주기적으로 오디오 청크를 처리하고 평가 결과 획득"""
         counter = 0
-        total_frames = 0
+        total_processed_frames = 0
         
         while not self.stop_event.is_set() and self.is_recording:
             if self.frames_buffer and self.session_id:
                 counter += 1
-                # 버퍼 상태 로깅
-                buffer_size = len(self.frames_buffer)
-                total_frames += buffer_size
                 
-                print(f"[처리 #{counter}] 버퍼 크기: {buffer_size} 프레임, 누적: {total_frames} 프레임")
+                # 현재 버퍼의 프레임만 처리하기 위해 복사 후 비우기
+                # 스레드 안전성을 위해 임시 변수에 복사
+                current_frames = self.frames_buffer.copy()
+                # 버퍼 비우기 - 중요!
+                self.frames_buffer = []
                 
-                frames_to_process = self.frames_buffer.copy()
-                audio_binary = b''.join(frames_to_process)
+                # 현재 처리할 오디오 정보 표시
+                frame_count = len(current_frames)
+                total_processed_frames += frame_count
                 
-                # 바이너리 크기 확인
-                print(f"[처리 #{counter}] 바이너리 크기: {len(audio_binary)} 바이트")
+                print(f"[처리 #{counter}] 현재 처리: {frame_count} 프레임, 총 처리됨: {total_processed_frames} 프레임")
+                
+                # 오디오 바이너리 데이터 생성
+                audio_binary = b''.join(current_frames)
+                binary_size = len(audio_binary)
+                
+                # 오디오 길이 계산 (16000Hz, 16bit)
+                audio_seconds = binary_size / (16000 * 2)
+                print(f"[처리 #{counter}] 오디오 길이: {audio_seconds:.2f}초, 크기: {binary_size} 바이트")
                 
                 # 엔진 호출 전
                 start_time = time.time()
-                print(f"[엔진 호출] 시작: {start_time}, 데이터 크기: {len(audio_binary)} 바이트")
-
+                
                 # 엔진 호출
                 result = self.engine.evaluate_audio(self.session_id, audio_binary)
-
+                
                 # 엔진 호출 후
                 end_time = time.time()
-                print(f"[엔진 호출] 완료: {end_time}, 소요 시간: {end_time - start_time:.3f}초")
+                print(f"[엔진 호출] 소요 시간: {end_time - start_time:.3f}초")
                 
                 self.current_result = result
                 
                 # 결과 상태 확인
                 print(f"[처리 #{counter}] 결과 상태: {result.get('status', 'unknown')}")
                 
-                # 버퍼 변화 확인
-                print(f"[처리 #{counter}] 처리 후 버퍼 크기: {len(self.frames_buffer)} 프레임")
-                
+                # 결과 표시
                 self._display_result(result)
                 
                 # 결과 분석
@@ -125,7 +131,8 @@ class RealtimeAudioProcessor:
                     print(f"[엔진 응답] 인식된 단어 수: {word_count}")
                     if "error" in result:
                         print(f"[엔진 오류] {result['error']}: {result.get('message', '')}")
-                
+            
+            # 처리 주기 (0.3초)
             time.sleep(0.3)
     
     def _display_result(self, result):

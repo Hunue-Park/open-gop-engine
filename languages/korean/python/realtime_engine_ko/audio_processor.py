@@ -48,14 +48,25 @@ class AudioProcessor:
             Optional[torch.Tensor]: 처리된 오디오 텐서 또는 None
         """
         try:
-            # 먼저 int16으로 가정하고 처리 (PyAudio 기본 포맷)
-            audio_data = np.frombuffer(binary_data, dtype=np.int16).astype(np.float32) / 32768.0
+            # 원본 바이너리 데이터 정보 출력
+            print(f"원본 바이너리 크기: {len(binary_data)} 바이트")
+            
+            # Int16으로 변환
+            audio_samples = np.frombuffer(binary_data, dtype=np.int16)
+            print(f"샘플 수: {len(audio_samples)}, 예상 시간: {len(audio_samples)/self.sample_rate:.2f}초")
+            
+            # float32로 변환
+            audio_data = audio_samples.astype(np.float32) / 32768.0
+            
+            # 버퍼 상태 출력
+            print(f"버퍼 추가 전: {len(self.audio_buffer)} 샘플, 버퍼 시간: {len(self.audio_buffer)/self.sample_rate:.2f}초")
             
             # 버퍼에 추가
             self.audio_buffer = np.append(self.audio_buffer, audio_data)
             
             # 최대 길이 제한
             if len(self.audio_buffer) > self.max_buffer_length:
+                print(f"audio_buffer 최대 길이에 도달했습니다. 길이: {len(self.audio_buffer)}")
                 self.audio_buffer = self.audio_buffer[-self.max_buffer_length:]
             
             # 전체 버퍼에 대한 전처리 및 반환
@@ -100,7 +111,7 @@ class AudioProcessor:
     
     def _detect_voice_activity(self, audio_data: np.ndarray, 
                             energy_threshold: float = 0.00005,
-                            min_speech_frames: int = 5) -> bool:
+                            min_speech_frames: int = 10) -> bool:
         """
         간단한 에너지 기반 VAD 구현
         
