@@ -230,9 +230,9 @@ def main():
     BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
     
     # 설정
-    MODEL_PATH = os.path.join(BASE_DIR, "models/wav2vec2_ctc_dynamic.onnx")
+    MODEL_PATH = os.path.join(BASE_DIR, "models/wav2vec2_ctc_combined.onnx")
     TOKENIZER_PATH = os.path.join(BASE_DIR, "models/tokenizer.json")
-    REFERENCE_TEXT = "미래는 그 누구도 알 수 없습니다. 어제를 돌아보면 비로소 내일이 보입니다. 지금껏 내가 이룬 것들이 내일과 이어진다는 믿음을 갖고 전진해야 합니다."
+    REFERENCE_TEXT = "안녕하세요 제 이름은 박준호 입니다. 만나서 반갑습니다."
     OUTPUT_DIR = os.path.join(BASE_DIR, "recordings")
     
     # 출력 디렉토리 생성

@@ -1,5 +1,6 @@
 /venv/
 /languages/korean/models/wav2vec2_ctc_dynamic.onnx
+/languages/korean/models/wav2vec2_ctc_combined.onnx
 /languages/korean/cpp/build/
 /languages/korean/cpp/build-ios/
 /languages/korean/cpp/build-ios-simulator/

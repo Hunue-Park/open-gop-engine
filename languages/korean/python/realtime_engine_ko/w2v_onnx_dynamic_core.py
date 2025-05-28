@@ -58,36 +58,47 @@ class Wav2VecCTCOnnxCore:
         if hidden_dim is None or vocab_size is None:
             raise RuntimeError("Could not determine hidden_dim or vocab_size from model outputs.")
 
-        # 5) load prototype matrix (lm_head weight)
+        # 5) load & dequantize lm_head weight (prototype matrix)
         proto = None
-        # 양자화 관련 로직 제거하고 직접 적절한 가중치 찾기
+        # try to find quantized weight + scale + zero_point
+        quant_init = None
         for init in self.onnx_model.graph.initializer:
             arr = numpy_helper.to_array(init)
-            # 예상되는 프로토타입 행렬 모양 확인
-            if arr.ndim == 2:
-                # (vocab_size, hidden_dim) 형태인 경우
-                if arr.shape == (vocab_size, hidden_dim):
+            # look for (hidden_dim, vocab_size) quantized weight
+            if arr.ndim == 2 and arr.shape == (hidden_dim, vocab_size) and init.name.endswith("_quantized"):
+                quant_init = init
+                quant_arr = arr.astype(np.float32)
+                break
+
+        if quant_init is not None:
+            base = quant_init.name[:-len("_quantized")]
+            # find scale and zero_point of shape (vocab_size,)
+            scale_arr = numpy_helper.to_array(
+                next(i for i in self.onnx_model.graph.initializer if i.name == base + "_scale")
+            ).astype(np.float32)
+            zp_arr = numpy_helper.to_array(
+                next(i for i in self.onnx_model.graph.initializer if i.name == base + "_zero_point")
+            ).astype(np.float32)
+            # dequantize: (Q - zp) * scale
+            dequant = (quant_arr - zp_arr) * scale_arr
+            # transpose => (vocab_size, hidden_dim)
+            proto = dequant.T
+        else:
+            # fallback: scan initializers for exact or transposed orientation
+            for init in self.onnx_model.graph.initializer:
+                arr = numpy_helper.to_array(init)
+                if arr.ndim == 2 and arr.shape == (vocab_size, hidden_dim):
                     proto = arr
                     break
-                # (hidden_dim, vocab_size) 형태인 경우 - 전치 필요
-                elif arr.shape == (hidden_dim, vocab_size):
-                    proto = arr.T
-                    break
-
-        if proto is None:
-            # 모델 구조에 따라 이름으로 찾는 방법도 추가 가능
-            for init in self.onnx_model.graph.initializer:
-                if "lm_head" in init.name or "output_proj" in init.name:
+            if proto is None:
+                for init in self.onnx_model.graph.initializer:
                     arr = numpy_helper.to_array(init)
-                    if arr.ndim == 2:
-                        if arr.shape == (vocab_size, hidden_dim):
-                            proto = arr
-                        elif arr.shape == (hidden_dim, vocab_size):
-                            proto = arr.T
+                    if arr.ndim == 2 and arr.shape == (hidden_dim, vocab_size):
+                        proto = arr.T
                         break
 
         if proto is None:
-            raise RuntimeError("Prototype matrix not found in any initializer.")
+            raise RuntimeError("Prototype matrix (lm_head weight) not found in any initializer.")
         self.prototype_matrix = proto
 
         logger.debug("Loaded prototype_matrix of shape %s", self.prototype_matrix.shape)

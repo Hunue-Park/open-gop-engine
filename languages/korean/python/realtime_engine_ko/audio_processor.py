@@ -99,8 +99,8 @@ class AudioProcessor:
         return tensor
     
     def _detect_voice_activity(self, audio_data: np.ndarray, 
-                            energy_threshold: float = 0.0005,
-                            min_speech_frames: int = 10) -> bool:
+                            energy_threshold: float = 0.00005,
+                            min_speech_frames: int = 5) -> bool:
         """
         간단한 에너지 기반 VAD 구현
         
@@ -128,7 +128,7 @@ class AudioProcessor:
         
         # 로깅 (디버깅용)
         avg_energy = np.mean(energies) if energies else 0
-        logger.debug(f"VAD: 평균 에너지={avg_energy:.6f}, 음성 프레임={speech_frames}/{len(energies)}")
+        print(f"VAD: 평균 에너지={avg_energy:.6f}, 음성 프레임={speech_frames}/{len(energies)}")
         
         # 임계값을 넘는 프레임이 충분한지 확인
         return speech_frames >= min_speech_frames
