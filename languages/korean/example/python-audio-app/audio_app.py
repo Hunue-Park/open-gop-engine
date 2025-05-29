@@ -253,7 +253,6 @@ def main():
         onnx_model_path=MODEL_PATH,
         tokenizer_path=TOKENIZER_PATH,
         confidence_threshold=30,  # 약간 낮은 임계값 설정
-        # matrix_path=MATRIX_PATH   # 추가: 매트릭스 경로 전달
     )
     print("엔진 초기화 완료!")
     

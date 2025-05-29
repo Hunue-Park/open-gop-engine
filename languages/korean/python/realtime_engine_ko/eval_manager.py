@@ -62,7 +62,7 @@ class EvaluationController:
             Dict[str, Any]: 평가 결과 및 상태 정보
         """
         # 입력 로깅
-        print(f"[PYTHON][Eval] 프로세스 시작: 오디오 크기={audio_chunk.shape}, 활성 블록={self.sentence_manager.active_block_id}")
+        # print(f"[PYTHON][Eval] 프로세스 시작: 오디오 크기={audio_chunk.shape}, 활성 블록={self.sentence_manager.active_block_id}")
         
         # 활성 윈도우 내 블록 ID 목록 가져오기
         active_window = self.progress_tracker.get_active_window()
@@ -132,12 +132,6 @@ class EvaluationController:
             except Exception as e:
                 logger.error(f"블록 {block_id} GOP 계산 중 오류: {e}")
         
-        # 매칭 결과 로깅
-        if best_match_id is not None:
-            print(f"[PYTHON][Eval] 매칭 결과: 블록={best_match_id}, 점수={best_match_score:.2f}, 임계값={self.confidence_threshold}")
-        else:
-            print(f"[PYTHON][Eval] 매칭 없음: 활성 윈도우={active_window}")
-        
         # 최적 매치 블록을 찾았으면 해당 블록 평가 진행
         if best_match_id is not None and best_match_score >= self.confidence_threshold:
             # 평가 가능한 시점인지 확인
@@ -156,13 +150,11 @@ class EvaluationController:
                     self.progress_tracker.set_current_index(self.sentence_manager.active_block_id)
                 elif best_match_id < self.sentence_manager.active_block_id:
                     # 2. 이전 블록이 인식된 경우 (순서가 뒤바뀐 발화)
-                    logger.info(f"이전 블록 {best_match_id}가 인식됨 (현재 활성 블록: {self.sentence_manager.active_block_id})")
                     self.sentence_manager.set_active_block(best_match_id)
                     self.sentence_manager.advance_active_block()
                     self.progress_tracker.set_current_index(self.sentence_manager.active_block_id)
                 elif best_match_id > self.sentence_manager.active_block_id:
                     # 3. 다음 블록이 인식된 경우 (블록을 건너뛴 경우)
-                    logger.info(f"건너뛴 블록 {best_match_id}가 인식됨 (현재 활성 블록: {self.sentence_manager.active_block_id})")
                     self.sentence_manager.set_active_block(best_match_id + 1)
                     if best_match_id + 1 >= len(self.sentence_manager.blocks):
                         self.sentence_manager.set_active_block(best_match_id)
@@ -264,7 +256,6 @@ class EvaluationController:
         
         self.sentence_manager.update_block_status(block_id, BlockStatus.EVALUATED)
         
-        logger.info(f"블록 {block_id} ({block.text}) 평가 완료: 점수={block.gop_score}")
     
     def get_evaluation_summary(self) -> Dict[str, Any]:
         """

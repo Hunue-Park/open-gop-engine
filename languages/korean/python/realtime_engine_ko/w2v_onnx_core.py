@@ -178,8 +178,6 @@ class Wav2VecCTCOnnxCore:
         return words
 
     def calculate_gop_from_tensor(self, audio_tensor: torch.Tensor, text: str, eps: float = 1e-8) -> dict:
-        # 입력 값 로깅
-        print(f"[PYTHON][GOP] 입력: 텐서 크기={audio_tensor.shape}, 텍스트='{text}'")
         
         # 텐서를 numpy 배열로 변환
         input_np = audio_tensor.numpy()
@@ -251,9 +249,6 @@ class Wav2VecCTCOnnxCore:
             round(sum(w["scores"]["pronunciation"] for w in words) / len(words), 1)
             if words else 0.0
         )
-
-        # 결과 로깅
-        print(f"[PYTHON][GOP] 결과: 전체 점수={overall}, 단어 수={len(words)}")
         return {"overall": overall, "pronunciation": overall, "words": words}
 
     def calculate_gop_with_context(self, audio_tensor: torch.Tensor, target_text: str, 

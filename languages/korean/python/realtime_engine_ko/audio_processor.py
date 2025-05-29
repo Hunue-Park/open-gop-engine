@@ -48,40 +48,29 @@ class AudioProcessor:
             Optional[torch.Tensor]: 처리된 오디오 텐서 또는 None
         """
         try:
-            # 원본 바이너리 데이터 정보 출력
-            print(f"원본 바이너리 크기: {len(binary_data)} 바이트")
             
             # Int16으로 변환
             audio_samples = np.frombuffer(binary_data, dtype=np.int16)
-            print(f"샘플 수: {len(audio_samples)}, 예상 시간: {len(audio_samples)/self.sample_rate:.2f}초")
             
             # float32로 변환
             audio_data = audio_samples.astype(np.float32) / 32768.0
-            
-            # 버퍼 상태 출력
-            print(f"버퍼 추가 전: {len(self.audio_buffer)} 샘플, 버퍼 시간: {len(self.audio_buffer)/self.sample_rate:.2f}초")
             
             # 버퍼에 추가
             self.audio_buffer = np.append(self.audio_buffer, audio_data)
             
             # 최대 길이 제한
             if len(self.audio_buffer) > self.max_buffer_length:
-                print(f"audio_buffer 최대 길이에 도달했습니다. 길이: {len(self.audio_buffer)}")
                 self.audio_buffer = self.audio_buffer[-self.max_buffer_length:]
             
             # 버퍼 통계
             max_val = np.max(np.abs(self.audio_buffer))
-            print(f"[PYTHON][AudioProcessor] 버퍼 통계: 최대값={max_val:.6f}, 길이={len(self.audio_buffer)}, 시간={len(self.audio_buffer)/self.sample_rate:.2f}초")
             
             # VAD 정보 확장
             if not self._detect_voice_activity(self.audio_buffer):
-                print(f"[PYTHON][AudioProcessor] VAD 실패: 음성 감지되지 않음")
                 return None
             
             # 전처리 후 텐서 통계
             tensor = self._preprocess_audio_data(self.audio_buffer)
-            if tensor is not None:
-                print(f"[PYTHON][AudioProcessor] 출력 텐서: 크기={tensor.shape}, 최대값={tensor.abs().max().item():.6f}")
             
             return tensor
             
@@ -152,8 +141,6 @@ class AudioProcessor:
         
         # 로깅 (디버깅용)
         avg_energy = np.mean(energies) if energies else 0
-        print(f"[PYTHON][VAD] 파라미터: 임계값={energy_threshold}, 최소프레임={min_speech_frames}")
-        print(f"[PYTHON][VAD] 에너지 통계: 최대={avg_energy:.6f}, 평균={avg_energy:.6f}, 음성프레임={speech_frames}/{len(energies)}")
         
         # 임계값을 넘는 프레임이 충분한지 확인
         return speech_frames >= min_speech_frames
