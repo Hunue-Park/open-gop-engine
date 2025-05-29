@@ -1,0 +1,15 @@
+version: "3.8"
+
+services:
+  app:
+    container_name: speech-recognition-api
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ..:/app
+    environment:
+      - ENVIRONMENT=local
+    restart: unless-stopped

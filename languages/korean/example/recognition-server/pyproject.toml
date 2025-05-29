@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "speech-recognition-backend"
+version = "0.1.0"
+description = "speech recognition api serving application"
+authors = ["Your Name <you@example.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+fastapi = "^0.115.12"
+uvicorn = "^0.34.2"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
