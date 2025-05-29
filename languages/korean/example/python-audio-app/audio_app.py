@@ -239,7 +239,8 @@ def main():
     # 설정
     MODEL_PATH = os.path.join(BASE_DIR, "models/wav2vec2_ctc_combined.onnx")
     TOKENIZER_PATH = os.path.join(BASE_DIR, "models/tokenizer.json")
-    REFERENCE_TEXT = "안녕하세요 제 이름은 박준호 입니다. 만나서 반갑습니다."
+    MATRIX_PATH = os.path.join(BASE_DIR, "models/wav2vec2_ctc_combined")
+    REFERENCE_TEXT = "안녕하세요 제 이름은 박현우 입니다. 만나서 반갑습니다."
     OUTPUT_DIR = os.path.join(BASE_DIR, "recordings")
     
     # 출력 디렉토리 생성
@@ -251,7 +252,8 @@ def main():
     engine = EngineCoordinator(
         onnx_model_path=MODEL_PATH,
         tokenizer_path=TOKENIZER_PATH,
-        confidence_threshold=30  # 약간 낮은 임계값 설정
+        confidence_threshold=30,  # 약간 낮은 임계값 설정
+        # matrix_path=MATRIX_PATH   # 추가: 매트릭스 경로 전달
     )
     print("엔진 초기화 완료!")
     

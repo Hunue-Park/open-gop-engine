@@ -69,8 +69,21 @@ class AudioProcessor:
                 print(f"audio_buffer 최대 길이에 도달했습니다. 길이: {len(self.audio_buffer)}")
                 self.audio_buffer = self.audio_buffer[-self.max_buffer_length:]
             
-            # 전체 버퍼에 대한 전처리 및 반환
-            return self._preprocess_audio_data(self.audio_buffer)
+            # 버퍼 통계
+            max_val = np.max(np.abs(self.audio_buffer))
+            print(f"[PYTHON][AudioProcessor] 버퍼 통계: 최대값={max_val:.6f}, 길이={len(self.audio_buffer)}, 시간={len(self.audio_buffer)/self.sample_rate:.2f}초")
+            
+            # VAD 정보 확장
+            if not self._detect_voice_activity(self.audio_buffer):
+                print(f"[PYTHON][AudioProcessor] VAD 실패: 음성 감지되지 않음")
+                return None
+            
+            # 전처리 후 텐서 통계
+            tensor = self._preprocess_audio_data(self.audio_buffer)
+            if tensor is not None:
+                print(f"[PYTHON][AudioProcessor] 출력 텐서: 크기={tensor.shape}, 최대값={tensor.abs().max().item():.6f}")
+            
+            return tensor
             
         except Exception as e:
             logger.error(f"오디오 바이너리 처리 중 오류 발생: {e}")
@@ -139,7 +152,8 @@ class AudioProcessor:
         
         # 로깅 (디버깅용)
         avg_energy = np.mean(energies) if energies else 0
-        print(f"VAD: 평균 에너지={avg_energy:.6f}, 음성 프레임={speech_frames}/{len(energies)}")
+        print(f"[PYTHON][VAD] 파라미터: 임계값={energy_threshold}, 최소프레임={min_speech_frames}")
+        print(f"[PYTHON][VAD] 에너지 통계: 최대={avg_energy:.6f}, 평균={avg_energy:.6f}, 음성프레임={speech_frames}/{len(energies)}")
         
         # 임계값을 넘는 프레임이 충분한지 확인
         return speech_frames >= min_speech_frames

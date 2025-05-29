@@ -27,6 +27,10 @@ std::map<std::string, std::any> EvaluationController::ProcessRecognitionResult(
     const Eigen::Matrix<float, Eigen::Dynamic, 1>& audio_chunk,
     const std::map<std::string, std::any>& metadata) {
     
+    LOG_INFO("EvaluationController", "[CPP][Eval] 프로세스 시작: 오디오 크기=" + 
+                                std::to_string(audio_chunk.size()) + 
+                                ", 활성 블록=" + std::to_string(sentence_manager->active_block_id));
+    
     // 활성 윈도우 내 블록 ID 목록 가져오기
     std::vector<int> active_window = progress_tracker->GetActiveWindow();
     
@@ -123,6 +127,19 @@ std::map<std::string, std::any> EvaluationController::ProcessRecognitionResult(
             ss << "블록 " << block_id << " GOP 계산 중 오류: " << e.what();
             LOG_ERROR("EvaluationController", ss.str());
         }
+    }
+    
+    // 매칭 결과 로깅
+    if (best_match_id >= 0) {
+        LOG_INFO("EvaluationController", "[CPP][Eval] 매칭 결과: 블록=" + std::to_string(best_match_id) + 
+                                    ", 점수=" + std::to_string(best_match_score) + 
+                                    ", 임계값=" + std::to_string(confidence_threshold));
+    } else {
+        std::string window_str;
+        for (int id : active_window) {
+            window_str += std::to_string(id) + " ";
+        }
+        LOG_INFO("EvaluationController", "[CPP][Eval] 매칭 없음: 활성 윈도우=[" + window_str + "]");
     }
     
     // 최적 매치 블록을 찾았으면 해당 블록 평가 진행

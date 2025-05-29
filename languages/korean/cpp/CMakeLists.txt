@@ -41,6 +41,9 @@ find_package(Eigen3 REQUIRED)
 find_package(ONNXRuntime REQUIRED)
 find_package(SndFile REQUIRED)
 
+# UUID 라이브러리 추가
+find_package(UUID REQUIRED)
+
 # C++ 라이브러리 소스 및 헤더 파일
 set(SOURCES
     src/common.cpp
@@ -76,6 +79,7 @@ target_include_directories(realtime_engine_ko_cpp PUBLIC
     ${ONNXRUNTIME_INCLUDE_DIRS}
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/tokenizers-cpp/include
     ${SNDFILE_INCLUDE_DIRS}
+    ${UUID_INCLUDE_DIRS}
 )
 
 # 라이브러리 연결
@@ -84,6 +88,7 @@ target_link_libraries(realtime_engine_ko_cpp PUBLIC
     tokenizers_cpp
     ${SNDFILE_LIBRARIES}
     nlohmann_json::nlohmann_json
+    ${UUID_LIBRARIES}
 )
 
 # Python 바인딩 모듈 빌드

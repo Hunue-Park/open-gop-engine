@@ -15,70 +15,46 @@ namespace realtime_engine_ko {
 Wav2VecCTCOnnxCore::Wav2VecCTCOnnxCore(
     const std::string& onnx_model_path,
     const std::string& tokenizer_path,
-    const std::string& device)
+    const std::string& device,
+    const std::string& matrix_path)
     : weight_norm_mid(50.0f), weight_norm_steepness(0.2f) {
     
     try {
-        // 1) ONNX 세션 설정
+        // 1) session & model load
         Ort::SessionOptions session_options;
+        Ort::Env env(ORT_LOGGING_LEVEL_WARNING, "Wav2VecCTCOnnxCore");
+        
         if (device == "CPU") {
             session_options.SetIntraOpNumThreads(1);
             session_options.SetInterOpNumThreads(1);
             session_options.SetExecutionMode(ORT_SEQUENTIAL);
-            
-            // CPU 프로바이더 사용
-            Ort::Env env(ORT_LOGGING_LEVEL_WARNING, "Wav2VecCTCOnnxCore");
             session = std::make_unique<Ort::Session>(env, onnx_model_path.c_str(), session_options);
         } else {
             // CUDA 프로바이더 사용
             Ort::SessionOptions cuda_options;
             cuda_options.AppendExecutionProvider_CUDA(OrtCUDAProviderOptions{});
-            
-            Ort::Env env(ORT_LOGGING_LEVEL_WARNING, "Wav2VecCTCOnnxCore");
             session = std::make_unique<Ort::Session>(env, onnx_model_path.c_str(), cuda_options);
         }
         
-        // 2) 토크나이저 로드 - tokenizers-cpp 사용
-        // 파일에서 바이트 로드
-        std::string tokenizer_content;
-        {
-            std::ifstream file(tokenizer_path, std::ios::binary);
-            if (!file) {
-                throw std::runtime_error("토크나이저 파일을 열 수 없습니다: " + tokenizer_path);
-            }
-            
-            // 파일 내용을 std::string으로 직접 읽어옴
-            file.seekg(0, std::ios::end);
-            tokenizer_content.resize(file.tellg());
-            file.seekg(0, std::ios::beg);
-            file.read(&tokenizer_content[0], tokenizer_content.size());
+        // 2) 토크나이저 로드
+        std::ifstream tokenizer_file(tokenizer_path, std::ios::binary);
+        if (!tokenizer_file) {
+            throw std::runtime_error("토크나이저 파일을 열 수 없습니다: " + tokenizer_path);
         }
         
-        // tokenizers-cpp API를 사용하여 토크나이저 초기화 - 네임스페이스 수정
+        tokenizer_file.seekg(0, std::ios::end);
+        std::string tokenizer_content(tokenizer_file.tellg(), ' ');
+        tokenizer_file.seekg(0, std::ios::beg);
+        tokenizer_file.read(&tokenizer_content[0], tokenizer_content.size());
+        
         tokenizer = std::unique_ptr<tokenizers::Tokenizer>(
             tokenizers::Tokenizer::FromBlobJSON(tokenizer_content)
         );
         
-        LOG_INFO("Wav2VecCTCOnnxCore", "토크나이저 초기화 완료");
-        
-        // 3) 입출력 이름 가져오기
+        // 3) I/O names
         Ort::AllocatorWithDefaultOptions allocator;
-        
-        // 입력 정보
-        size_t num_input_nodes = session->GetInputCount();
-        if (num_input_nodes == 0) {
-            throw std::runtime_error("모델에 입력 노드가 없습니다.");
-        }
-        
-        // ONNX Runtime API 문서에 따라 수정
         auto input_name_ptr = session->GetInputNameAllocated(0, allocator);
         input_name = input_name_ptr.get();
-        
-        // 출력 정보
-        size_t num_output_nodes = session->GetOutputCount();
-        if (num_output_nodes < 2) {
-            throw std::runtime_error("모델에 충분한 출력 노드가 없습니다. 최소 2개 필요.");
-        }
         
         auto hidden_name_ptr = session->GetOutputNameAllocated(0, allocator);
         hidden_name = hidden_name_ptr.get();
@@ -86,13 +62,9 @@ Wav2VecCTCOnnxCore::Wav2VecCTCOnnxCore(
         auto logits_name_ptr = session->GetOutputNameAllocated(1, allocator);
         logits_name = logits_name_ptr.get();
         
-        LOG_INFO("Wav2VecCTCOnnxCore", "모델 I/O 이름: input=" + std::string(input_name) + 
-                ", hidden=" + std::string(hidden_name) + ", logits=" + std::string(logits_name));
-        
         // 4) hidden_dim & vocab_size 추론
-        // 출력 텐서 정보
-        Ort::TypeInfo hidden_type_info = session->GetOutputTypeInfo(0);
-        Ort::TypeInfo logits_type_info = session->GetOutputTypeInfo(1);
+        auto hidden_type_info = session->GetOutputTypeInfo(0);
+        auto logits_type_info = session->GetOutputTypeInfo(1);
         
         auto hidden_tensor_info = hidden_type_info.GetTensorTypeAndShapeInfo();
         auto logits_tensor_info = logits_type_info.GetTensorTypeAndShapeInfo();
@@ -103,15 +75,62 @@ Wav2VecCTCOnnxCore::Wav2VecCTCOnnxCore(
         int hidden_dim = hidden_shape[2];
         int vocab_size = logits_shape[2];
         
-        LOG_INFO("Wav2VecCTCOnnxCore", "hidden_dim=" + std::to_string(hidden_dim) + 
-                ", vocab_size=" + std::to_string(vocab_size));
+        // 매트릭스 경로 결정
+        std::string matrix_shape_path = matrix_path;
+        std::string matrix_data_path = matrix_path;
         
-        // 5) prototype 매트릭스 로드 (C++에서는 복잡해서 간소화)
-        // 실제 구현에서는 ONNX 모델에서 가중치를 직접 추출하는 로직 필요
-        // 여기서는 간단히 랜덤 행렬로 초기화
-        prototype_matrix = MatrixXf::Random(vocab_size, hidden_dim);
+        if (matrix_path.empty()) {
+            // 기본값: ONNX 모델 경로에서 확장자만 바꿈
+            matrix_shape_path = onnx_model_path.substr(0, onnx_model_path.find_last_of('.')) + "_shape.txt";
+            matrix_data_path = onnx_model_path.substr(0, onnx_model_path.find_last_of('.')) + "_matrix.bin";
+        } else {
+            // 사용자 지정 경로 사용
+            matrix_shape_path = matrix_path + "_shape.txt";
+            matrix_data_path = matrix_path + ".bin";
+        }
         
-        LOG_INFO("Wav2VecCTCOnnxCore", "Wav2VecCTCOnnxCore 초기화 완료");
+        // 5) Prototype matrix 초기화 - 저장된 파일 로드
+        try {
+            // 형태 정보 읽기
+            std::ifstream shape_file(matrix_shape_path);
+            int loaded_vocab_size, loaded_hidden_dim;
+            if (shape_file) {
+                shape_file >> loaded_vocab_size >> loaded_hidden_dim;
+                shape_file.close();
+            } else {
+                throw std::runtime_error("매트릭스 형태 파일을 찾을 수 없습니다: " + matrix_shape_path);
+            }
+            
+            // 매트릭스 초기화
+            prototype_matrix = MatrixXf(loaded_vocab_size, loaded_hidden_dim);
+            
+            // 바이너리 데이터 읽기
+            std::ifstream data_file(matrix_data_path, std::ios::binary);
+            if (data_file) {
+                data_file.read(reinterpret_cast<char*>(prototype_matrix.data()), 
+                              sizeof(float) * loaded_vocab_size * loaded_hidden_dim);
+                data_file.close();
+            } else {
+                throw std::runtime_error("매트릭스 데이터 파일을 찾을 수 없습니다");
+            }
+            
+            LOG_INFO("Wav2VecCTCOnnxCore", "프로토타입 매트릭스 로드 완료");
+        } catch (const std::exception& e) {
+            LOG_ERROR("Wav2VecCTCOnnxCore", "프로토타입 매트릭스 로드 실패: " + std::string(e.what()));
+            LOG_WARNING("Wav2VecCTCOnnxCore", "대체 방법으로 임시 초기화 사용");
+            
+            // 오류 발생 시 임시 초기화
+            prototype_matrix = MatrixXf(vocab_size, hidden_dim);
+            for (int i = 0; i < vocab_size; i++) {
+                for (int j = 0; j < hidden_dim; j++) {
+                    prototype_matrix(i, j) = 0.01f * ((i + j) % 10);
+                }
+            }
+        }
+
+        LOG_INFO("Wav2VecCTCOnnxCore", "프로토타입 매트릭스 준비 완료: shape=" + 
+            std::to_string(prototype_matrix.rows()) + "x" + std::to_string(prototype_matrix.cols()));
+        
     } catch (const Ort::Exception& e) {
         std::string error_msg = "ONNX 초기화 오류: " + std::string(e.what());
         LOG_ERROR("Wav2VecCTCOnnxCore", error_msg);
@@ -148,8 +167,9 @@ std::pair<std::vector<int>, std::vector<int>> Wav2VecCTCOnnxCore::DtwAlign(const
     return dtw::dtw_align(x_vecs, y_vecs);
 }
 
-std::string Wav2VecCTCOnnxCore::Transcribe(const std::string& audio_path, const std::vector<int>& raw_ids) {
-    LOG_DEBUG("Wav2VecCTCOnnxCore", "로그: " + audio_path);
+std::string Wav2VecCTCOnnxCore::Transcribe(const std::vector<int>& raw_ids) {
+    // 메서드 내용 유지하되 audio_path 매개변수 제거
+    LOG_DEBUG("Wav2VecCTCOnnxCore", "로그: raw_ids 처리");
     
     // special tokens
     std::string blank_token = "|";      // CTC blank
@@ -182,6 +202,7 @@ std::string Wav2VecCTCOnnxCore::Transcribe(const std::string& audio_path, const 
         prev = idx;
     }
     
+    // 디버깅 로그
     std::stringstream ss;
     ss << "CTC‑decoded IDs: ";
     for (int id : dedup_ids) {
@@ -237,14 +258,13 @@ std::vector<std::map<std::string, std::any>> Wav2VecCTCOnnxCore::GroupWordsSigmo
                     word_text += s;
                 }
                 
-                float word_score = std::round(
-                    WeightedAvgWithSigmoid(current_word, weight_norm_mid, weight_norm_steepness));
+                float word_score = WeightedAvgWithSigmoid(current_word, weight_norm_mid, weight_norm_steepness);
                 
                 std::map<std::string, std::any> word_map;
                 word_map["word"] = word_text;
                 
                 std::map<std::string, std::any> scores_map;
-                scores_map["pronunciation"] = static_cast<int>(word_score);
+                scores_map["pronunciation"] = word_score;
                 word_map["scores"] = scores_map;
                 
                 words.push_back(word_map);
@@ -262,14 +282,13 @@ std::vector<std::map<std::string, std::any>> Wav2VecCTCOnnxCore::GroupWordsSigmo
             word_text += s;
         }
         
-        float word_score = std::round(
-            WeightedAvgWithSigmoid(current_word, weight_norm_mid, weight_norm_steepness));
+        float word_score = WeightedAvgWithSigmoid(current_word, weight_norm_mid, weight_norm_steepness);
         
         std::map<std::string, std::any> word_map;
         word_map["word"] = word_text;
         
         std::map<std::string, std::any> scores_map;
-        scores_map["pronunciation"] = static_cast<int>(word_score);
+        scores_map["pronunciation"] = word_score;
         word_map["scores"] = scores_map;
         
         words.push_back(word_map);
@@ -282,6 +301,9 @@ std::map<std::string, std::any> Wav2VecCTCOnnxCore::CalculateGopFromTensor(
     const Eigen::Matrix<float, Eigen::Dynamic, 1>& audio_tensor,
     const std::string& text,
     float eps) {
+    
+    LOG_INFO("Wav2VecCTCOnnxCore", "[CPP][GOP] 입력: 텐서 크기=" + std::to_string(audio_tensor.size()) +
+                              ", 텍스트='" + text + "'");
     
     try {
         // 입력 텐서 준비 (배치 차원 추가)
@@ -451,7 +473,7 @@ std::map<std::string, std::any> Wav2VecCTCOnnxCore::CalculateGopFromTensor(
         if (!words.empty()) {
             for (const auto& word : words) {
                 auto scores = std::any_cast<std::map<std::string, std::any>>(word.at("scores"));
-                overall += std::any_cast<int>(scores.at("pronunciation"));
+                overall += std::any_cast<float>(scores.at("pronunciation"));
             }
             overall /= words.size();
         }
@@ -461,6 +483,10 @@ std::map<std::string, std::any> Wav2VecCTCOnnxCore::CalculateGopFromTensor(
         result["overall"] = std::round(overall * 10) / 10;  // 소수점 첫째 자리까지
         result["pronunciation"] = std::round(overall * 10) / 10;
         result["words"] = words;
+        
+        // 결과 로깅
+        LOG_INFO("Wav2VecCTCOnnxCore", "[CPP][GOP] 결과: 전체 점수=" + std::to_string(overall) + 
+                                  ", 단어 수=" + std::to_string(words.size()));
         
         return result;
         
@@ -548,7 +574,7 @@ std::map<std::string, std::any> Wav2VecCTCOnnxCore::CalculateGopWithContext(
     if (!target_words.empty()) {
         for (const auto& word : target_words) {
             auto scores = std::any_cast<std::map<std::string, std::any>>(word.at("scores"));
-            target_score += std::any_cast<int>(scores.at("pronunciation"));
+            target_score += std::any_cast<float>(scores.at("pronunciation"));
         }
         target_score /= target_words.size();
     }

@@ -16,6 +16,28 @@
 
 namespace realtime_engine_ko {
 
+// RecordListener 클래스 - Python 구현과 일치
+class RecordListener {
+public:
+    RecordListener(
+        std::function<void()> on_start = nullptr,
+        std::function<void()> on_tick = nullptr,
+        std::function<void(const std::string&)> on_start_record_fail = nullptr,
+        std::function<void()> on_record_end = nullptr,
+        std::function<void(const std::map<std::string, std::any>&)> on_score = nullptr
+    ) : on_start(on_start),
+        on_tick(on_tick),
+        on_start_record_fail(on_start_record_fail),
+        on_record_end(on_record_end),
+        on_score(on_score) {}
+        
+    std::function<void()> on_start;                                  // 녹음 시작
+    std::function<void()> on_tick;                                  // 진행 틱
+    std::function<void(const std::string&)> on_start_record_fail;   // 녹음 시작 실패
+    std::function<void()> on_record_end;                            // 녹음 종료
+    std::function<void(const std::map<std::string, std::any>&)> on_score;  // 평가 결과
+};
+
 // EngineCoordinator 클래스
 class EngineCoordinator {
 public:
@@ -34,12 +56,13 @@ public:
         const std::string& onnx_model_path,
         const std::string& tokenizer_path,
         const std::string& device = "CPU",
-        float confidence_threshold = 0.7f);
+        float confidence_threshold = 0.7f,
+        const std::string& matrix_path = "");
     
     // 소멸자
     ~EngineCoordinator();
     
-    // 세션 관리 메서드
+    // 세션 관리 메서드 - Python 구현과 일치
     std::map<std::string, std::any> CreateSession(
         const std::string& sentence,
         const std::map<std::string, std::any>& engine_options = {});

@@ -61,6 +61,9 @@ class EvaluationController:
         Returns:
             Dict[str, Any]: 평가 결과 및 상태 정보
         """
+        # 입력 로깅
+        print(f"[PYTHON][Eval] 프로세스 시작: 오디오 크기={audio_chunk.shape}, 활성 블록={self.sentence_manager.active_block_id}")
+        
         # 활성 윈도우 내 블록 ID 목록 가져오기
         active_window = self.progress_tracker.get_active_window()
         
@@ -128,6 +131,12 @@ class EvaluationController:
                 
             except Exception as e:
                 logger.error(f"블록 {block_id} GOP 계산 중 오류: {e}")
+        
+        # 매칭 결과 로깅
+        if best_match_id is not None:
+            print(f"[PYTHON][Eval] 매칭 결과: 블록={best_match_id}, 점수={best_match_score:.2f}, 임계값={self.confidence_threshold}")
+        else:
+            print(f"[PYTHON][Eval] 매칭 없음: 활성 윈도우={active_window}")
         
         # 최적 매치 블록을 찾았으면 해당 블록 평가 진행
         if best_match_id is not None and best_match_score >= self.confidence_threshold:

@@ -52,16 +52,12 @@ PYBIND11_MODULE(pyrealtime, m) {
     
     //--- EngineCoordinator 바인딩 ---
     py::class_<realtime_engine_ko::EngineCoordinator>(m, "EngineCoordinator")
-        .def(py::init<
-            const std::string&,
-            const std::string&,
-            const std::string&,
-            float>(),
+        .def(py::init<const std::string&, const std::string&, const std::string&, float, const std::string&>(),
              py::arg("onnx_model_path"),
              py::arg("tokenizer_path"),
              py::arg("device") = "CPU",
-             py::arg("confidence_threshold") = 0.7f
-        )
+             py::arg("confidence_threshold") = 0.7f,
+             py::arg("matrix_path") = "")
         .def("create_session", [](realtime_engine_ko::EngineCoordinator &self, 
                                const std::string &sentence,
                                const py::dict &options = py::dict()) {

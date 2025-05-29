@@ -3,24 +3,32 @@
 #include "realtime_engine_ko/common.h"
 #include <sstream>
 #include <chrono>
-#include <thread>
-#include <nlohmann/json.hpp>
 #include <uuid/uuid.h>
 
 namespace realtime_engine_ko {
+
+// RecordListener 구현은 여기에 필요 없음 (헤더에서 선언됨)
 
 // EngineCoordinator 구현
 EngineCoordinator::EngineCoordinator(
     const std::string& onnx_model_path,
     const std::string& tokenizer_path,
     const std::string& device,
-    float confidence_threshold)
+    float confidence_threshold,
+    const std::string& matrix_path)
     : confidence_threshold(confidence_threshold) {
     
     try {
-        // 인식 엔진 초기화
+        // 매트릭스 경로 결정
+        std::string effective_matrix_path = matrix_path;
+        if (effective_matrix_path.empty()) {
+            // 기본값: ONNX 모델 경로에서 확장자만 바꿈
+            effective_matrix_path = onnx_model_path.substr(0, onnx_model_path.find_last_of('.')) + "_matrix.npy";
+        }
+        
+        // 인식 엔진 초기화 - 매트릭스 경로 전달
         recognition_engine = std::make_shared<Wav2VecCTCOnnxCore>(
-            onnx_model_path, tokenizer_path, device);
+            onnx_model_path, tokenizer_path, device, effective_matrix_path);
         
         LOG_INFO("EngineCoordinator", "RecognitionEngine 초기화 완료");
         LOG_INFO("EngineCoordinator", "EngineCoordinator 초기화 완료");
@@ -71,7 +79,7 @@ std::map<std::string, std::any> EngineCoordinator::CreateSession(
         auto sentence_manager = std::make_shared<SentenceBlockManager>(sentence);
         auto progress_tracker = std::make_shared<ProgressTracker>(
             sentence_manager->blocks.size(), 3, false);
-        auto audio_processor = std::make_shared<AudioProcessor>(16000);
+        auto audio_processor = std::make_shared<AudioProcessor>(16000, 10.0);
         auto eval_controller = std::make_shared<EvaluationController>(
             recognition_engine,
             sentence_manager,
@@ -129,7 +137,7 @@ std::map<std::string, std::any> EngineCoordinator::EvaluateAudio(
     session.last_activity = std::chrono::system_clock::now();
     
     try {
-        // 오디오 데이터 처리
+        // 오디오 데이터 처리 - 누적된 버퍼 사용
         Eigen::Matrix<float, Eigen::Dynamic, 1> audio_tensor = 
             session.audio_processor->ProcessAudioBinary(binary_data);
         
@@ -187,6 +195,16 @@ std::map<std::string, std::any> EngineCoordinator::CloseSession(const std::strin
     return result;
 }
 
+std::map<std::string, std::any> EngineCoordinator::CreateEmptyResult() const {
+    std::map<std::string, std::any> result;
+    result["overall"] = 0.0f;
+    result["pronunciation"] = 0.0f;
+    result["resource_version"] = std::string("1.0.0");
+    result["words"] = std::vector<std::map<std::string, std::any>>();
+    result["eof"] = false;
+    return result;
+}
+
 std::map<std::string, std::any> EngineCoordinator::GetSessionStatus(const std::string& session_id) {
     if (sessions.find(session_id) == sessions.end()) {
         std::map<std::string, std::any> error_result;
@@ -235,16 +253,6 @@ int EngineCoordinator::CleanupInactiveSessions(float max_inactive_time) {
     
     LOG_INFO("EngineCoordinator", "비활성 세션 정리: " + std::to_string(sessions_to_remove.size()) + "개 제거됨");
     return sessions_to_remove.size();
-}
-
-std::map<std::string, std::any> EngineCoordinator::CreateEmptyResult() const {
-    std::map<std::string, std::any> result;
-    result["total_avg_score"] = 0.0f;
-    result["pronunciation"] = 0.0f;
-    result["resource_version"] = std::string("1.0.0");
-    result["words"] = std::vector<std::map<std::string, std::any>>();
-    result["eof"] = false;
-    return result;
 }
 
 } // namespace realtime_engine_ko
