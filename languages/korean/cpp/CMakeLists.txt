@@ -13,6 +13,9 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
+# --- PkgConfig 모듈 먼저 찾기 ---
+find_package(PkgConfig REQUIRED)
+
 # tokenizers-cpp 서브모듈 추가
 add_subdirectory(third_party/tokenizers-cpp)
 
@@ -39,10 +42,19 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 # 필수 패키지
 find_package(Eigen3 REQUIRED)
 find_package(ONNXRuntime REQUIRED)
-find_package(SndFile REQUIRED)
+# find_package(SndFile REQUIRED) # 기존 라인 주석 처리 또는 삭제
 
 # UUID 라이브러리 추가
-find_package(UUID REQUIRED)
+# find_package(UUID REQUIRED) # 기존 라인 주석 처리 또는 삭제
+
+# pkg-config를 사용하여 UUID 찾기 (SNDFILE과 동일한 PkgConfig 모듈 사용)
+pkg_check_modules(UUID REQUIRED uuid) 
+# 이제 UUID_INCLUDE_DIRS 와 UUID_LIBRARIES 변수를 사용할 수 있음
+
+# pkg-config를 사용하여 SndFile 찾기
+pkg_check_modules(SNDFILE REQUIRED sndfile) 
+# 이제 SNDFILE_INCLUDE_DIRS 와 SNDFILE_LIBRARIES 변수를 사용할 수 있음
+# 또는 SNDFILE_CFLAGS, SNDFILE_LDFLAGS 등 (pkg_check_modules 문서 참조)
 
 # C++ 라이브러리 소스 및 헤더 파일
 set(SOURCES

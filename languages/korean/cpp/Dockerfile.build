@@ -1,0 +1,57 @@
+ARG PYTHON_VERSION=3.12
+FROM python:${PYTHON_VERSION}-slim AS builder
+
+ARG DEBIAN_FRONTEND=noninteractive
+
+# 기본 빌드 도구 설치
+RUN apt-get update && apt-get install -y \
+    cmake \
+    g++ \
+    git \
+    # Python 개발 파일 (FROM 이미지의 Python 버전에 맞춤)
+    python3-dev \
+    # CMake에서 find_package로 찾는 라이브러리들
+    libeigen3-dev \
+    libsndfile1-dev \
+    uuid-dev \
+    curl \
+    pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+# Rust 설치 (tokenizers-cpp 빌드에 필요할 수 있음)
+RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
+# PATH에 cargo 추가
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# ONNX Runtime 설치 (CMakeLists.txt는 find_package(ONNXRuntime REQUIRED) 사용)
+# 사전 빌드된 라이브러리 다운로드 및 시스템 경로에 설치
+ARG ONNXRUNTIME_VERSION=1.18.0 
+ARG ORT_ARCH=linux-x64 # 또는 linux-aarch64 (FROM 이미지 아키텍처에 따라)
+RUN curl -L -o onnxruntime.tgz https://github.com/microsoft/onnxruntime/releases/download/v${ONNXRUNTIME_VERSION}/onnxruntime-${ORT_ARCH}-${ONNXRUNTIME_VERSION}.tgz && \
+    tar -xzf onnxruntime.tgz && \
+    cp -R onnxruntime-${ORT_ARCH}-${ONNXRUNTIME_VERSION}/include/* /usr/include/ && \
+    cp -R onnxruntime-${ORT_ARCH}-${ONNXRUNTIME_VERSION}/lib/* /usr/lib/ && \
+    rm -rf onnxruntime.tgz onnxruntime-${ORT_ARCH}-${ONNXRUNTIME_VERSION} && \
+    ldconfig
+
+# 소스 코드 복사 (Dockerfile.build가 cpp 디렉토리에 있다고 가정)
+COPY . /workdir/cpp
+WORKDIR /workdir/cpp
+
+# 기존 빌드 디렉토리 삭제 후 새로 생성, CMake 실행
+RUN rm -rf build && mkdir build && cd build && \
+    echo "Attempting to use Python executable: $(which python3)" && \
+    cmake .. \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DPYTHON_EXECUTABLE=$(which python3) \
+        # tokenizers-cpp가 python${PYTHON_VERSION}을 사용하도록 추가 설정이 필요할 수 있음
+        # (예: -DTOKENIZERS_PYTHON_VERSION=${PYTHON_VERSION})
+    && \
+    make -j$(nproc)
+
+# 빌드된 .so 파일을 /output 디렉토리로 복사 (쉽게 추출하기 위함)
+# CMakeLists.txt의 LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/python" 설정에 따라
+# .so 파일은 build/python/ 내에 생성됨.
+RUN mkdir /output && \
+    # 파일 이름이 pyrealtime.cpython-312-x86_64-linux-gnu.so 와 같이 ABI 태그를 포함할 것임
+    cp build/python/pyrealtime.*.so /output/
