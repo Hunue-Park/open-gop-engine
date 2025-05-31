@@ -28,4 +28,6 @@ COPY languages/korean/example/recognition-server/app /app/languages/korean/examp
 # PYTHONPATH 설정
 ENV PYTHONPATH=/app/languages/korean/example/recognition-server
 
-CMD ["poetry", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# Poetry를 통해 실행하되, 작업 디렉토리를 명시적으로 지정
+WORKDIR /app/languages/korean/example/recognition-server
+CMD poetry run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --log-level info

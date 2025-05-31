@@ -1,0 +1,9 @@
+{
+  "timestamp": "20250531_132414",
+  "sequence": 1,
+  "size_bytes": 88244,
+  "session_id": "337ddaa2-7738-4873-8efd-593d01b2240f",
+  "format": "wav",
+  "expected_sample_rate": 16000,
+  "expected_bit_depth": 16
+}

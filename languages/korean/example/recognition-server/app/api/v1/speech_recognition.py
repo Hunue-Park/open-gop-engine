@@ -8,7 +8,7 @@ from app.schemas.recognition import (
     EvaluationResponse
 )
 
-router = APIRouter(prefix="/api/v1/speech", tags=["speech"])
+router = APIRouter(prefix="/speech", tags=["speech"])
 recognition_service = RecognitionService()
 
 

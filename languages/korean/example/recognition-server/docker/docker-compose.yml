@@ -10,6 +10,7 @@ services:
       - "8000:8000"
     volumes:
       - ../../../../../:/app/open-gop-engine
+      - ../:/app/open-gop-engine/languages/korean/example/recognition-server
     environment:
       - ENVIRONMENT=local
     restart: unless-stopped

@@ -15,7 +15,7 @@ class Settings:
     
     # 엔진 설정
     DEVICE = "CPU"
-    CONFIDENCE_THRESHOLD = 30
+    CONFIDENCE_THRESHOLD = 20
     
     # API 설정
     API_V1_STR = "/api/v1"
