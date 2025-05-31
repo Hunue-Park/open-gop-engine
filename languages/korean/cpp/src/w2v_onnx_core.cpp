@@ -25,12 +25,12 @@ Wav2VecCTCOnnxCore::Wav2VecCTCOnnxCore(
         Ort::Env env(ORT_LOGGING_LEVEL_WARNING, "Wav2VecCTCOnnxCore");
         
         if (device == "CPU") {
-            session_options.SetIntraOpNumThreads(1);
-            session_options.SetInterOpNumThreads(1);
-            session_options.SetExecutionMode(ORT_SEQUENTIAL);
+            // CPU 스레드 설정 (이전 논의에 따라 주석 처리 또는 최적화된 값으로 유지)
+            // session_options.SetIntraOpNumThreads(1); 
+            // session_options.SetInterOpNumThreads(1); 
+            // session_options.SetExecutionMode(ORT_SEQUENTIAL); 
             session = std::make_unique<Ort::Session>(env, onnx_model_path.c_str(), session_options);
         } else {
-            // CUDA 프로바이더 사용
             Ort::SessionOptions cuda_options;
             cuda_options.AppendExecutionProvider_CUDA(OrtCUDAProviderOptions{});
             session = std::make_unique<Ort::Session>(env, onnx_model_path.c_str(), cuda_options);
@@ -75,58 +75,20 @@ Wav2VecCTCOnnxCore::Wav2VecCTCOnnxCore(
         int hidden_dim = hidden_shape[2];
         int vocab_size = logits_shape[2];
         
-        // 매트릭스 경로 결정
-        std::string matrix_shape_path = matrix_path;
-        std::string matrix_data_path = matrix_path;
-        
-        if (matrix_path.empty()) {
-            // 기본값: ONNX 모델 경로에서 확장자만 바꿈
-            matrix_shape_path = onnx_model_path.substr(0, onnx_model_path.find_last_of('.')) + "_shape.txt";
-            matrix_data_path = onnx_model_path.substr(0, onnx_model_path.find_last_of('.')) + "_matrix.bin";
-        } else {
-            // 사용자 지정 경로 사용
-            matrix_shape_path = matrix_path + "_shape.txt";
-            matrix_data_path = matrix_path + ".bin";
-        }
-        
-        // 5) Prototype matrix 초기화 - 저장된 파일 로드
-        try {
-            // 형태 정보 읽기
-            std::ifstream shape_file(matrix_shape_path);
-            int loaded_vocab_size, loaded_hidden_dim;
-            if (shape_file) {
-                shape_file >> loaded_vocab_size >> loaded_hidden_dim;
-                shape_file.close();
-            } else {
-                throw std::runtime_error("매트릭스 형태 파일을 찾을 수 없습니다: " + matrix_shape_path);
-            }
+        // 5) Prototype matrix 항상 임의 초기화
+        LOG_INFO("Wav2VecCTCOnnxCore", "Prototype matrix를 항상 임의의 값으로 초기화합니다.");
+        LOG_INFO("Wav2VecCTCOnnxCore", "모델에서 추론된 vocab_size=" + std::to_string(vocab_size) + ", hidden_dim=" + std::to_string(hidden_dim));
             
-            // 매트릭스 초기화
-            prototype_matrix = MatrixXf(loaded_vocab_size, loaded_hidden_dim);
-            
-            // 바이너리 데이터 읽기
-            std::ifstream data_file(matrix_data_path, std::ios::binary);
-            if (data_file) {
-                data_file.read(reinterpret_cast<char*>(prototype_matrix.data()), 
-                              sizeof(float) * loaded_vocab_size * loaded_hidden_dim);
-                data_file.close();
-            } else {
-                throw std::runtime_error("매트릭스 데이터 파일을 찾을 수 없습니다");
-            }
-            
-            LOG_INFO("Wav2VecCTCOnnxCore", "프로토타입 매트릭스 로드 완료");
-        } catch (const std::exception& e) {
-            LOG_ERROR("Wav2VecCTCOnnxCore", "프로토타입 매트릭스 로드 실패: " + std::string(e.what()));
-            LOG_WARNING("Wav2VecCTCOnnxCore", "대체 방법으로 임시 초기화 사용");
-            
-            // 오류 발생 시 임시 초기화
-            prototype_matrix = MatrixXf(vocab_size, hidden_dim);
-            for (int i = 0; i < vocab_size; i++) {
-                for (int j = 0; j < hidden_dim; j++) {
-                    prototype_matrix(i, j) = 0.01f * ((i + j) % 10);
-                }
+        prototype_matrix = MatrixXf(vocab_size, hidden_dim);
+        for (int i = 0; i < vocab_size; i++) {
+            for (int j = 0; j < hidden_dim; j++) {
+                // 여기의 임시 값 생성 로직은 필요에 따라 변경 가능합니다.
+                // 예를 들어, 0으로 초기화하거나, 특정 범위의 랜덤 값으로 채울 수 있습니다.
+                // 현재는 Python의 임시 초기화와 유사하게 설정합니다.
+                prototype_matrix(i, j) = 0.01f * ((i + j) % 10); 
             }
         }
+        LOG_INFO("Wav2VecCTCOnnxCore", "프로토타입 매트릭스가 임시 값으로 초기화됨.");
 
         LOG_INFO("Wav2VecCTCOnnxCore", "프로토타입 매트릭스 준비 완료: shape=" + 
             std::to_string(prototype_matrix.rows()) + "x" + std::to_string(prototype_matrix.cols()));
