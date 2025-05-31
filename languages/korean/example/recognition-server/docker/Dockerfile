@@ -2,28 +2,30 @@
 FROM python:3.12.3
 
 # Poetry 설치
-RUN pip install -U poetry
+RUN pip install poetry
 
-# 경로 정의
+# 앱 코드가 위치할 디렉토리 생성
 WORKDIR /app
 
-# 로컬에 있는 pyproject.toml, poetry.lock 파일을 컨테이너로 복사
-COPY poetry.lock pyproject.toml /app/
+# Poetry 설정 - 가상환경 생성하지 않도록 설정
+RUN poetry config virtualenvs.create false
 
-# Poetry를 이용하여 의존성 설치 
-RUN poetry config virtualenvs.create false \
- && poetry install --no-root --no-interaction 
+# realtime_engine_ko 의존성 먼저 설치
+RUN pip install torch numpy onnxruntime
 
-# 로컬에 있는 소스코드를 컨테이너로 복사
-COPY . /app
+# realtime_engine_ko 패키지 복사 및 설치
+COPY languages/korean/python /app/languages/korean/python
+RUN pip install -e /app/languages/korean/python
 
-# Python 경로 설정
-ENV PYTHONPATH=/usr/local/bin/python3.12
+# 프로젝트 의존성 파일 복사 및 설치
+COPY languages/korean/example/recognition-server/pyproject.toml /app/languages/korean/example/recognition-server/
+WORKDIR /app/languages/korean/example/recognition-server
+RUN poetry install --no-root
 
-# Poetry 바이너리 권한 확인 및 설정
-RUN chmod +x /usr/local/bin/poetry
+# 애플리케이션 코드 복사
+COPY languages/korean/example/recognition-server/app /app/languages/korean/example/recognition-server/app
 
-# Poetry가 설치된 Python을 사용하도록 설정
-RUN sed -i '1s|^.*$|#!/usr/local/bin/python3.12|' /usr/local/bin/poetry
+# PYTHONPATH 설정
+ENV PYTHONPATH=/app/languages/korean/example/recognition-server
 
 CMD ["poetry", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

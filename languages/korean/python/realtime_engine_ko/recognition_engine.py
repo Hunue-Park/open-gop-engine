@@ -1,11 +1,8 @@
 import time
 import logging
-import threading
-import json
 import uuid
 from typing import Dict, Any, List, Optional, Callable, Union
 import numpy as np
-import torch
 
 from realtime_engine_ko.sentence_block import SentenceBlockManager, BlockStatus
 from realtime_engine_ko.progress_tracker import ProgressTracker

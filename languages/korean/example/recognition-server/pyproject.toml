@@ -9,6 +9,9 @@ readme = "README.md"
 python = "^3.12"
 fastapi = "^0.115.12"
 uvicorn = "^0.34.2"
+python-multipart = "^0.0.9"
+pydantic-settings = "^2.2.1"
+realtime-engine-ko = {path = "../../python"}
 
 
 [build-system]

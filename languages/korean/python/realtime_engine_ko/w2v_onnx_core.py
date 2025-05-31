@@ -1,5 +1,4 @@
 import numpy as np
-import soundfile as sf
 import onnx
 import onnxruntime as ort
 from onnx import numpy_helper

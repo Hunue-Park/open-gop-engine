@@ -7,7 +7,11 @@ setup(
     packages=find_packages(),
     install_requires=[
         "numpy",
-        "onnxruntime"
+        "onnxruntime",
+        "torch",
+        "onnx",
+        "tokenizers",
+        "dtw-python"
     ],
     description="한국어 실시간 음성 평가 엔진",
     author="OpenGOP Team",

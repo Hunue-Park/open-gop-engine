@@ -4,12 +4,12 @@ services:
   app:
     container_name: speech-recognition-api
     build:
-      context: ..
-      dockerfile: docker/Dockerfile
+      context: ../../../../../
+      dockerfile: languages/korean/example/recognition-server/docker/Dockerfile
     ports:
       - "8000:8000"
     volumes:
-      - ..:/app
+      - ../../../../../:/app/open-gop-engine
     environment:
       - ENVIRONMENT=local
     restart: unless-stopped
