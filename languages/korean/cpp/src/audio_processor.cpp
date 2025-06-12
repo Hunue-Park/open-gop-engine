@@ -79,8 +79,8 @@ Eigen::Matrix<float, Eigen::Dynamic, 1> AudioProcessor::ProcessAudioBinary(
                                ", 시간=" + std::to_string(audio_buffer.size() / sample_rate) + "초");
         
         // VAD 직접 파라미터 지정 및 로깅
-        const float vad_threshold = 0.00005f;
-        const int min_frames = 10;  // Python과 일치시킴
+        const float vad_threshold = 0.0001f;
+        const int min_frames = 20;  // Python과 일치시킴
         
         LOG_INFO("AudioProcessor", "[CPP][VAD] 파라미터: 임계값=" + std::to_string(vad_threshold) + 
                                ", 최소프레임=" + std::to_string(min_frames));

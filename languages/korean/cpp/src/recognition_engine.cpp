@@ -79,7 +79,7 @@ std::map<std::string, std::any> EngineCoordinator::CreateSession(
         auto sentence_manager = std::make_shared<SentenceBlockManager>(sentence);
         auto progress_tracker = std::make_shared<ProgressTracker>(
             sentence_manager->blocks.size(), 3, false);
-        auto audio_processor = std::make_shared<AudioProcessor>(16000, 10.0);
+        auto audio_processor = std::make_shared<AudioProcessor>(16000, 3.0);
         auto eval_controller = std::make_shared<EvaluationController>(
             recognition_engine,
             sentence_manager,

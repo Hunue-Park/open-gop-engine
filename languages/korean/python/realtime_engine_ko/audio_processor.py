@@ -111,8 +111,8 @@ class AudioProcessor:
         return tensor
     
     def _detect_voice_activity(self, audio_data: np.ndarray, 
-                            energy_threshold: float = 0.00005,
-                            min_speech_frames: int = 10) -> bool:
+                            energy_threshold: float = 0.0001,
+                            min_speech_frames: int = 20) -> bool:
         """
         간단한 에너지 기반 VAD 구현
         
