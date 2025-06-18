@@ -18,6 +18,8 @@ py::dict convert_any_map_to_dict(const std::map<std::string, std::any>& map) {
         try {
             if (value.type() == typeid(int)) {
                 result[key.c_str()] = std::any_cast<int>(value);
+            } else if (value.type() == typeid(size_t)) {
+                result[key.c_str()] = std::any_cast<size_t>(value);
             } else if (value.type() == typeid(float)) {
                 result[key.c_str()] = std::any_cast<float>(value);
             } else if (value.type() == typeid(double)) {
@@ -70,10 +72,8 @@ PYBIND11_MODULE(pyrealtime, m) {
                     // 올바른 타입 변환 (handle -> object)
                     py::handle h = item.second;
                     
-                    if (py::isinstance<py::float_>(h)) {
+                    if (py::isinstance<py::float_>(h) || py::isinstance<py::int_>(h)) {
                         cpp_options[key] = py::cast<float>(h);
-                    } else if (py::isinstance<py::int_>(h)) {
-                        cpp_options[key] = py::cast<int>(h);
                     } else if (py::isinstance<py::bool_>(h)) {
                         cpp_options[key] = py::cast<bool>(h);
                     } else if (py::isinstance<py::str>(h)) {

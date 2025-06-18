@@ -76,8 +76,6 @@ Wav2VecCTCOnnxCore::Wav2VecCTCOnnxCore(
         int vocab_size = logits_shape[2];
         
         // 5) Prototype matrix 항상 임의 초기화
-        LOG_INFO("Wav2VecCTCOnnxCore", "Prototype matrix를 항상 임의의 값으로 초기화합니다.");
-        LOG_INFO("Wav2VecCTCOnnxCore", "모델에서 추론된 vocab_size=" + std::to_string(vocab_size) + ", hidden_dim=" + std::to_string(hidden_dim));
             
         prototype_matrix = MatrixXf(vocab_size, hidden_dim);
         for (int i = 0; i < vocab_size; i++) {
@@ -88,10 +86,6 @@ Wav2VecCTCOnnxCore::Wav2VecCTCOnnxCore(
                 prototype_matrix(i, j) = 0.01f * ((i + j) % 10); 
             }
         }
-        LOG_INFO("Wav2VecCTCOnnxCore", "프로토타입 매트릭스가 임시 값으로 초기화됨.");
-
-        LOG_INFO("Wav2VecCTCOnnxCore", "프로토타입 매트릭스 준비 완료: shape=" + 
-            std::to_string(prototype_matrix.rows()) + "x" + std::to_string(prototype_matrix.cols()));
         
     } catch (const Ort::Exception& e) {
         std::string error_msg = "ONNX 초기화 오류: " + std::string(e.what());
@@ -264,8 +258,6 @@ std::map<std::string, std::any> Wav2VecCTCOnnxCore::CalculateGopFromTensor(
     const std::string& text,
     float eps) {
     
-    LOG_INFO("Wav2VecCTCOnnxCore", "[CPP][GOP] 입력: 텐서 크기=" + std::to_string(audio_tensor.size()) +
-                              ", 텍스트='" + text + "'");
     
     try {
         // 입력 텐서 준비 (배치 차원 추가)
@@ -445,10 +437,6 @@ std::map<std::string, std::any> Wav2VecCTCOnnxCore::CalculateGopFromTensor(
         result["overall"] = std::round(overall * 10) / 10;  // 소수점 첫째 자리까지
         result["pronunciation"] = std::round(overall * 10) / 10;
         result["words"] = words;
-        
-        // 결과 로깅
-        LOG_INFO("Wav2VecCTCOnnxCore", "[CPP][GOP] 결과: 전체 점수=" + std::to_string(overall) + 
-                                  ", 단어 수=" + std::to_string(words.size()));
         
         return result;
         

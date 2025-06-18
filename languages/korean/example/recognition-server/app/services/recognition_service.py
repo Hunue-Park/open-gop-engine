@@ -2,7 +2,7 @@ import os
 import logging
 from datetime import datetime
 from typing import Dict, Any, Optional
-from realtime_engine_ko.recognition_engine import EngineCoordinator
+from realtime_engine_ko import EngineCoordinator
 from app.core.config import settings
 from pathlib import Path
 import time
@@ -36,7 +36,7 @@ class RecognitionService:
     
     def create_session(self, sentence: str, options: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """새로운 인식 세션 생성"""
-        result = self.engine.create_session(sentence, engine_options=options or {})
+        result = self.engine.create_session(sentence, options=options or {})
         return result
     
     def evaluate_audio(self, session_id: str, audio_data: bytes) -> Dict[str, Any]:

@@ -104,7 +104,6 @@ SentenceBlockManager::SentenceBlockManager(const std::string& sentence, const st
     
     std::stringstream ss;
     ss << "SentenceBlockManager 초기화: " << blocks.size() << " 블록 생성됨";
-    LOG_INFO("SentenceBlockManager", ss.str());
 }
 
 std::shared_ptr<SentenceBlock> SentenceBlockManager::GetBlock(int block_id) const {
@@ -135,7 +134,6 @@ bool SentenceBlockManager::SetActiveBlock(int block_id) {
     
     std::stringstream ss;
     ss << "활성 블록 변경: " << block_id;
-    LOG_INFO("SentenceBlockManager", ss.str());
     
     return true;
 }

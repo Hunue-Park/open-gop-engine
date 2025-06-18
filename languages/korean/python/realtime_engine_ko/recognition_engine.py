@@ -66,7 +66,7 @@ class EngineCoordinator:
         # 설정값
         self.confidence_threshold = confidence_threshold
         
-        logger.info("EngineCoordinator 초기화 완료")
+        logger.info("EngineCoordinator 초기화 완료 in python")
     
     def create_session(self, sentence: str, engine_options: Dict[str, Any] = {}) -> Dict[str, Any]:
         """

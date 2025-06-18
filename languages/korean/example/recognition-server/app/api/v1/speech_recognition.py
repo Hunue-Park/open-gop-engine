@@ -19,6 +19,7 @@ async def create_session(request: SessionCreateRequest):
         result = recognition_service.create_session(request.sentence, request.options)
         return result
     except Exception as e:
+        print(e)
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/evaluate/{session_id}", response_model=EvaluationResponse)

@@ -30,8 +30,8 @@ EngineCoordinator::EngineCoordinator(
         recognition_engine = std::make_shared<Wav2VecCTCOnnxCore>(
             onnx_model_path, tokenizer_path, device, effective_matrix_path);
         
-        LOG_INFO("EngineCoordinator", "RecognitionEngine 초기화 완료");
-        LOG_INFO("EngineCoordinator", "EngineCoordinator 초기화 완료");
+        LOG_INFO("EngineCoordinator", "RecognitionEngine 초기화 완료 in CPP");
+        LOG_INFO("EngineCoordinator", "EngineCoordinator 초기화 완료 in CPP");
     } catch (const std::exception& e) {
         std::string error_msg = "EngineCoordinator 초기화 오류: " + std::string(e.what());
         LOG_ERROR("EngineCoordinator", error_msg);

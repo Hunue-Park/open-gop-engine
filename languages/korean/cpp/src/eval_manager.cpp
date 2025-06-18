@@ -27,10 +27,6 @@ std::map<std::string, std::any> EvaluationController::ProcessRecognitionResult(
     const Eigen::Matrix<float, Eigen::Dynamic, 1>& audio_chunk,
     const std::map<std::string, std::any>& metadata) {
     
-    LOG_INFO("EvaluationController", "[CPP][Eval] 프로세스 시작: 오디오 크기=" + 
-                                std::to_string(audio_chunk.size()) + 
-                                ", 활성 블록=" + std::to_string(sentence_manager->active_block_id));
-    
     // 활성 윈도우 내 블록 ID 목록 가져오기
     std::vector<int> active_window = progress_tracker->GetActiveWindow();
     
@@ -129,19 +125,6 @@ std::map<std::string, std::any> EvaluationController::ProcessRecognitionResult(
         }
     }
     
-    // 매칭 결과 로깅
-    if (best_match_id >= 0) {
-        LOG_INFO("EvaluationController", "[CPP][Eval] 매칭 결과: 블록=" + std::to_string(best_match_id) + 
-                                    ", 점수=" + std::to_string(best_match_score) + 
-                                    ", 임계값=" + std::to_string(confidence_threshold));
-    } else {
-        std::string window_str;
-        for (int id : active_window) {
-            window_str += std::to_string(id) + " ";
-        }
-        LOG_INFO("EvaluationController", "[CPP][Eval] 매칭 없음: 활성 윈도우=[" + window_str + "]");
-    }
-    
     // 최적 매치 블록을 찾았으면 해당 블록 평가 진행
     if (best_match_id >= 0 && best_match_score >= confidence_threshold) {
         // 평가 가능한 시점인지 확인
@@ -168,7 +151,6 @@ std::map<std::string, std::any> EvaluationController::ProcessRecognitionResult(
                 std::stringstream ss;
                 ss << "이전 블록 " << best_match_id << "가 인식됨 (현재 활성 블록: " 
                    << sentence_manager->active_block_id << ")";
-                LOG_INFO("EvaluationController", ss.str());
                 
                 // 활성 블록 상태 업데이트
                 sentence_manager->SetActiveBlock(best_match_id);
@@ -184,7 +166,6 @@ std::map<std::string, std::any> EvaluationController::ProcessRecognitionResult(
                 std::stringstream ss;
                 ss << "건너뛴 블록 " << best_match_id << "가 인식됨 (현재 활성 블록: " 
                    << sentence_manager->active_block_id << ")";
-                LOG_INFO("EvaluationController", ss.str());
                 
                 // 활성 블록을 인식된 블록 다음으로 설정
                 int next_block_id = best_match_id + 1;
@@ -330,7 +311,6 @@ void EvaluationController::EvaluateBlock(int block_id, const std::map<std::strin
     
     std::stringstream ss;
     ss << "블록 " << block_id << " (" << block->text << ") 평가 완료: 점수=" << block->gop_score.value();
-    LOG_INFO("EvaluationController", ss.str());
 }
 
 std::map<std::string, std::any> EvaluationController::GetEvaluationSummary() const {
