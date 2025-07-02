@@ -11,9 +11,8 @@ RUN apt-get update && \
         curl && \
     rm -rf /var/lib/apt/lists/*
 
-# (만약 cpp/Dockerfile.build와 동일하게 ONNX Runtime을 설치해야 한다면)
+# ONNX Runtime 설치
 ARG ONNXRUNTIME_VERSION=1.18.0 
-# 서버 이미지가 실행될 아키텍처 (linux_build.sh의 ORT_ARCH_ARG와 일치시켜야 함)
 ARG ORT_ARCH_FOR_SERVER=linux-aarch64 
 RUN curl -L -o onnxruntime.tgz https://github.com/microsoft/onnxruntime/releases/download/v${ONNXRUNTIME_VERSION}/onnxruntime-${ORT_ARCH_FOR_SERVER}-${ONNXRUNTIME_VERSION}.tgz && \
     tar -xzf onnxruntime.tgz && \
@@ -27,27 +26,23 @@ RUN pip install poetry
 # 앱 코드가 위치할 디렉토리 생성
 WORKDIR /app
 
-# Poetry 설정 - 가상환경 생성하지 않도록 설정
+# Poetry 설정
 RUN poetry config virtualenvs.create false
 
-# realtime_engine_ko 파이썬 패키지 의존성 (예: numpy)
-# RUN pip install numpy # poetry가 처리할 것이므로 중복 가능성
+# ✅ 기존 realtime_engine_ko 패키지 설치 부분 제거
+# ❌ COPY languages/korean/python /app/languages/korean/python
+# ❌ RUN pip install -e /app/languages/korean/python
 
-# realtime_engine_ko 패키지 복사 (이때 내부에 Linux용 pyrealtime.so 포함됨)
-COPY languages/korean/python /app/languages/korean/python
-RUN pip install -e /app/languages/korean/python 
-# 위 install 과정에서 realtime_engine_ko/__init__.py가 실행되면서 C++ 모듈 로드 시도
+# ✅ pyrealtime.so 파일만 직접 복사
+COPY languages/korean/example/recognition-server/pyrealtime.so /app/languages/korean/example/recognition-server/pyrealtime.so
 
-# 프로젝트 의존성 파일 복사 및 설치
+# 프로젝트 의존성 파일 복사 및 설치 (realtime-engine-ko 의존성 제거된 버전)
 COPY languages/korean/example/recognition-server/pyproject.toml /app/languages/korean/example/recognition-server/
 WORKDIR /app/languages/korean/example/recognition-server
-RUN poetry install --no-root # --no-dev 옵션도 고려
+RUN poetry install --no-root
 
-# 애플리케이션 코드 복사 (config.py 포함)
+# 애플리케이션 코드 복사
 COPY languages/korean/example/recognition-server/app /app/languages/korean/example/recognition-server/app
-
-# 모델 파일 복사 라인 주석 처리 또는 삭제 (볼륨 마운트 사용 시)
-# COPY models /app/models 
 
 WORKDIR /app/languages/korean/example/recognition-server
 CMD poetry run uvicorn app.main:app --host 0.0.0.0 --port 8000 --log-level info
